@@ -1,0 +1,24 @@
+# Secrets: never commit
+.env
+secrets/
+*.json.key
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Frontend
+node_modules/
+dist/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/launch.json
+
+# Local Claude Code settings
+.claude/settings.local.json
