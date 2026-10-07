@@ -43,6 +43,9 @@ export function ProfileSettings({ profile, onSaved, onDeleted }: Props) {
 
   return (
     <div className="grid gap-6">
+      {profile && provider && provider.credential_fields.length > 0 && (
+        <CredentialsCard profile={profile} fields={provider.credential_fields} label={provider.label} />
+      )}
       <Card>
         <CardHeader>
           <CardTitle>{profile ? 'Settings' : 'New profile'}</CardTitle>
@@ -136,9 +139,6 @@ export function ProfileSettings({ profile, onSaved, onDeleted }: Props) {
         </CardFooter>
       </Card>
 
-      {profile && provider && provider.credential_fields.length > 0 && (
-        <CredentialsCard profile={profile} fields={provider.credential_fields} label={provider.label} />
-      )}
       <ConstraintsHelp candidate={cfg.titles.candidate} />
     </div>
   )

@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { PlusIcon } from 'lucide-react'
+import type { Profile } from '@/api/client'
 import { useMeta, useProfiles } from '@/api/hooks'
 import { BookingsPanel } from '@/components/BookingsPanel'
 import { ProfileSettings } from '@/components/ProfileSettings'
 import { VenuesPanel } from '@/components/VenuesPanel'
+import { SetupCard } from '@/components/SetupCard'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
@@ -52,24 +54,36 @@ export default function App() {
         {creating ? (
           <ProfileSettings key="new" profile={null} onSaved={setSelected} onDeleted={() => setSelected(null)} />
         ) : current ? (
-          <Tabs defaultValue="bookings" key={current.id}>
-            <TabsList>
-              <TabsTrigger value="bookings">Bookings</TabsTrigger>
-              <TabsTrigger value="venues">Courts</TabsTrigger>
-              <TabsTrigger value="settings">Settings</TabsTrigger>
-            </TabsList>
-            <TabsContent value="bookings">
-              <BookingsPanel profileId={current.id} />
-            </TabsContent>
-            <TabsContent value="venues">
-              <VenuesPanel profileId={current.id} />
-            </TabsContent>
-            <TabsContent value="settings">
-              <ProfileSettings profile={current} onSaved={setSelected} onDeleted={() => setSelected(null)} />
-            </TabsContent>
-          </Tabs>
+          <ProfileView key={current.id} profile={current} onSaved={setSelected} onDeleted={() => setSelected(null)} />
         ) : null}
       </main>
+    </div>
+  )
+}
+
+type ViewProps = { profile: Profile; onSaved: (id: number) => void; onDeleted: () => void }
+
+function ProfileView({ profile, onSaved, onDeleted }: ViewProps) {
+  const [tab, setTab] = useState('bookings')
+  return (
+    <div className="grid content-start gap-4">
+      <SetupCard profile={profile} onOpenSettings={() => setTab('settings')} />
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList className="w-full">
+          <TabsTrigger value="bookings" className="flex-1">Bookings</TabsTrigger>
+          <TabsTrigger value="venues" className="flex-1">Courts</TabsTrigger>
+          <TabsTrigger value="settings" className="flex-1">Settings &amp; account</TabsTrigger>
+        </TabsList>
+        <TabsContent value="bookings">
+          <BookingsPanel profileId={profile.id} />
+        </TabsContent>
+        <TabsContent value="venues">
+          <VenuesPanel profileId={profile.id} />
+        </TabsContent>
+        <TabsContent value="settings">
+          <ProfileSettings profile={profile} onSaved={onSaved} onDeleted={onDeleted} />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
