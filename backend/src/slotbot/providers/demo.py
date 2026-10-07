@@ -5,7 +5,6 @@ and always refuses the first booking attempt so the fallback order shows up in t
 Nothing is ever booked; results are tagged `demo`.
 """
 
-from collections.abc import Sequence
 from datetime import date, datetime, time, timedelta
 from types import TracebackType
 from zoneinfo import ZoneInfo
@@ -49,9 +48,15 @@ class DemoSession:
     ) -> None:
         return None
 
-    async def free_slots(self, day: date, venues: Sequence[Venue]) -> list[Slot]:
+    async def is_open(self, day: date, venue: Venue) -> bool:
+        return True
+
+    async def free_slots(self, day: date, venue: Venue) -> list[Slot]:
         starts = [datetime.combine(day, time(hour), self._tz) for hour in range(8, 22)]
-        return [Slot(v, s, s + timedelta(hours=1), ref=f"{v.id}@{s:%H%M}") for v in venues for s in starts]
+        return [
+            Slot(venue, s, s + timedelta(hours=1), court="Court 1", ref=f"{venue.id}@{s:%H%M}")
+            for s in starts
+        ]
 
     async def book(self, slot: Slot) -> BookingResult:
         if not self._refused_once:

@@ -4,7 +4,7 @@ from collections.abc import Iterable
 
 import httpx
 
-from slotbot.ports import Provider
+from slotbot.ports import Geocoder, Provider
 from slotbot.providers.demo import DemoProvider
 from slotbot.providers.madrid import MadridTennis
 from slotbot.settings import Settings
@@ -24,5 +24,8 @@ class ProviderRegistry:
         return list(self._by_key.values())
 
 
-def build_registry(http: httpx.AsyncClient, settings: Settings) -> ProviderRegistry:
-    return ProviderRegistry([MadridTennis(http, opens_at=settings.madrid_opens_at), DemoProvider()])
+def build_registry(http: httpx.AsyncClient, geocoder: Geocoder, settings: Settings) -> ProviderRegistry:
+    madrid = MadridTennis(
+        http, geocoder, opens_at=settings.madrid_opens_at, light=settings.madrid_request_light
+    )
+    return ProviderRegistry([madrid, DemoProvider()])

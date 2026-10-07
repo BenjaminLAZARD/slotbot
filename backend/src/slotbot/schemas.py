@@ -1,6 +1,6 @@
 """API and configuration models (Pydantic). ProfileConfig is also what the UI form edits."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -60,6 +60,13 @@ class VenueOut(BaseModel):
     name: str
     address: str
     minutes: int
+
+
+class LoginCheckOut(BaseModel):
+    venue: str
+    day: date
+    open: bool
+    free_slots: int
 
 
 class BookingOut(BaseModel):

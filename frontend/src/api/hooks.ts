@@ -123,3 +123,15 @@ export function useRetry(profileId: number) {
     onError,
   })
 }
+
+export function useCheckLogin(profileId: number) {
+  return useMutation({
+    mutationFn: () =>
+      call(api.POST('/api/profiles/{profile_id}/check-login', { params: { path: { profile_id: profileId } } })),
+    onSuccess: (r) =>
+      toast.success(
+        `Logged in. ${r.venue}, ${r.day}: ${r.open ? `${r.free_slots} free slots` : 'not bookable yet'}`,
+      ),
+    onError,
+  })
+}

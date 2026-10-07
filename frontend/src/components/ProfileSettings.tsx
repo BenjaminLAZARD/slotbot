@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import type { Profile, ProfileConfig } from '@/api/client'
-import { useDeleteProfile, useMeta, useSaveProfile, useSetCredentials } from '@/api/hooks'
+import { useCheckLogin, useDeleteProfile, useMeta, useSaveProfile, useSetCredentials } from '@/api/hooks'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -146,6 +146,7 @@ export function ProfileSettings({ profile, onSaved, onDeleted }: Props) {
 
 function CredentialsCard({ profile, fields, label }: { profile: Profile; fields: string[]; label: string }) {
   const setCredentials = useSetCredentials(profile.id)
+  const checkLogin = useCheckLogin(profile.id)
   const [values, setValues] = useState<Record<string, string>>({})
   return (
     <Card>
@@ -170,7 +171,14 @@ function CredentialsCard({ profile, fields, label }: { profile: Profile; fields:
           </Field>
         ))}
       </CardContent>
-      <CardFooter className="justify-end">
+      <CardFooter className="justify-end gap-2">
+        <Button
+          variant="ghost"
+          disabled={!profile.has_credentials || checkLogin.isPending}
+          onClick={() => checkLogin.mutate()}
+        >
+          {checkLogin.isPending ? 'Logging in…' : 'Test login'}
+        </Button>
         <Button
           variant="outline"
           disabled={setCredentials.isPending || fields.some((f) => !values[f])}

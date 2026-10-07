@@ -58,6 +58,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/profiles/{profile_id}/check-login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Login
+         * @description Log in with the stored credentials and read the closest venue's furthest open day. Books nothing.
+         */
+        post: operations["check_login_api_profiles__profile_id__check_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/profiles/{profile_id}/venues": {
         parameters: {
             query?: never;
@@ -259,6 +279,20 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** LoginCheckOut */
+        LoginCheckOut: {
+            /** Venue */
+            venue: string;
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Open */
+            open: boolean;
+            /** Free Slots */
+            free_slots: number;
         };
         /** MetaOut */
         MetaOut: {
@@ -578,6 +612,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_login_api_profiles__profile_id__check_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginCheckOut"];
+                };
             };
             /** @description Validation Error */
             422: {

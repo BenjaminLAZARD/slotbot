@@ -79,7 +79,7 @@ async def test_race_books_writes_back_and_promotes_next_event(sessions, clock):
     assert e1.title == "Success - Tennis"
     assert e1.start.hour == 19 and e1.location.startswith("Demo Court B")  # A refused once by demo
     assert "Result: BOOKED Demo Court B (Casa de Campo)" in e1.description
-    assert "Demo Court A (Retiro) 19:00 → taken" in e1.description
+    assert "Demo Court A (Retiro) · Court 1 19:00 → taken" in e1.description
     assert calendar.events["e2"].title == "Pending Tennis"  # next one prepared right away
     async with sessions() as db:
         statuses = {b.event_id: b.status for b in await db.scalars(select(Booking))}

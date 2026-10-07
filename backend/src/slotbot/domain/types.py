@@ -42,7 +42,12 @@ class Slot:
     venue: Venue
     start: datetime
     end: datetime
+    court: str = ""  # e.g. "Tenis 1" when a venue has several courts
     ref: str = ""  # opaque provider handle needed to book this exact slot
+
+    @property
+    def label(self) -> str:
+        return f"{self.venue.name} · {self.court}" if self.court else self.venue.name
 
 
 class Outcome(StrEnum):

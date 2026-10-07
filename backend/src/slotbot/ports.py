@@ -1,6 +1,5 @@
 """Interfaces the services depend on. Adapters (Google, Madrid, Cloud Tasks...) implement them."""
 
-from collections.abc import Sequence
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -34,8 +33,12 @@ class Geocoder(Protocol):
 class ProviderSession(Protocol):
     """A logged-in session with a booking system, alive for one race."""
 
-    async def free_slots(self, day: date, venues: Sequence[Venue]) -> list[Slot]:
-        """Slots bookable right now. Empty before the booking window opens."""
+    async def is_open(self, day: date, venue: Venue) -> bool:
+        """Whether slots on `day` can be booked yet (polled every second before opening)."""
+        ...
+
+    async def free_slots(self, day: date, venue: Venue) -> list[Slot]:
+        """Free slots at one venue on `day` (fetched lazily, closest venue first)."""
         ...
 
     async def book(self, slot: Slot) -> BookingResult: ...

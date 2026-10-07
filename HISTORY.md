@@ -1,8 +1,50 @@
 # History
 
 Dated log of what changed and **why**, newest first. Written for whoever (human or Claude) picks the
-project up next: read the latest entry and its *Open items* before changing anything. Append a new
-entry at the end of each working session.
+project up next: read the latest entry and its *Open items* before changing anything. Add a new
+entry at the top at the end of each working session.
+
+---
+
+## 2026-10-07 (evening) · v0.2: Madrid site reverse-engineered
+
+### Context
+Benjamin created the Google service account (key in `secrets/`, calendar shared) and signed in to
+deportesweb.madrid.es in the Claude browser pane. Claude explored the site read-only from that
+session (no booking, no password handled) and from anonymous sessions.
+
+### Findings (details: docs/madrid-api.md)
+- ASP.NET WebForms partial postbacks with JSON `__EVENTARGUMENT` actions; delta-format responses.
+- **Anonymous browsing works** for the centre list (33 tennis centres, codes + addresses) and the
+  availability grids. Login is only needed to book.
+- An unopened day still renders an all-free grid; **the usage's `dates` list is the opening signal**.
+- Slots are 60 min starting at :30; some ask about floodlights (paid).
+- At 20:51 on Wed 7 Oct, bookable days were 7–13 Oct (D−6 open). Exact hour: probe running.
+
+### Changes
+- `providers/deportesweb.py`: protocol client (postback, delta parser, form fields, grid parser,
+  login, anonymous browsing, tennis navigation, facility/usage/day, reserve).
+- `providers/madrid.py`: venues now come **from the booking site** (anonymous), placed with
+  open-data coordinates (30/33) or Nominatim on the address (3/33); `MadridSession` implements
+  `is_open` / `free_slots`; `book` deliberately refuses to press Reservar until the payment step is
+  captured.
+- Ports: `ProviderSession` is now per venue (`is_open(day, venue)`, `free_slots(day, venue)`), and
+  `Slot` has a `court` (e.g. "Tenis 1").
+- Race rewritten: poll `is_open` every second before opening; then one pass, best candidate first,
+  loading venues lazily and stopping early when a slot within 30 min of the requested time is free
+  (`IDEAL`); stop on success or when everything acceptable was refused (no blind retries).
+- `POST /api/profiles/{id}/check-login` + "Test login" button: logs in and reads the nearest grid.
+- Nominatim client rate-limited to 1 req/s; `SLOTBOT_MADRID_REQUEST_LIGHT` (default yes).
+- `scripts/probe_madrid_opening.py`: anonymous probe that records when D−6 becomes bookable.
+- Tests: 19 (new: race semantics, protocol parsing on synthetic responses).
+
+### Open items
+1. **Capture the payment step** (one real booking by Benjamin in the browser pane, wallet payment,
+   cancellable within 10 min) and implement `MadridSession.book`.
+2. Read the probe result → set `SLOTBOT_MADRID_OPENS_AT`.
+3. Benjamin: create the profile in the UI (calendar ID, home, credentials) → "Test login".
+4. Decide: floodlights policy; whether multi-sport courts ("Pista polideportiva") are acceptable.
+5. Previous open items (GCP deploy, product track) unchanged.
 
 ---
 

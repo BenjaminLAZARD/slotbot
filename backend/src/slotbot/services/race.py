@@ -1,9 +1,10 @@
 """The booking race: wake up before the window opens, poll every second, book the best free slot."""
 
 import logging
+from collections.abc import Awaitable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from typing import Any
+from datetime import date, datetime, timedelta
+from typing import Any, TypeVar
 
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -12,7 +13,7 @@ from slotbot.adapters.clock import sleep_until
 from slotbot.adapters.vault import Vault
 from slotbot.domain.describe import compose, result_lines, retitle
 from slotbot.domain.ranking import candidates
-from slotbot.domain.types import Attempt, BookingResult, Outcome, Plan, RaceReport
+from slotbot.domain.types import Attempt, BookingResult, Outcome, Plan, RaceReport, Slot
 from slotbot.models import Booking, BookingStatus, Profile, utcnow
 from slotbot.ports import Calendar, Clock, EventChanges, Provider, ProviderSession
 from slotbot.providers import ProviderRegistry
@@ -21,6 +22,7 @@ from slotbot.services.planner import Planner
 from slotbot.services.sync import SyncService
 
 log = logging.getLogger(__name__)
+T = TypeVar("T")
 
 
 @dataclass(frozen=True)
@@ -31,48 +33,111 @@ class Timing:
     retry_for: timedelta  # how long after opening we keep trying
 
 
-async def run_race(plan: Plan, session: ProviderSession, clock: Clock, timing: Timing) -> RaceReport:
-    """Poll availability until a slot is booked or the retry window closes.
+# A free slot this close to the requested time can't be beaten by checking further venues.
+IDEAL = timedelta(minutes=30)
 
-    Each pass tries every acceptable free slot in order (requested time first, then nearest
-    times; closest venue first within a time). A slot refused once is not retried.
+
+async def run_race(plan: Plan, session: ProviderSession, clock: Clock, timing: Timing) -> RaceReport:
+    """Wait for the window to open, then book the best acceptable slot, best first.
+
+    1. Before opening: ask `is_open` once per `poll_every` (one cheap request).
+    2. Once open: walk candidates in order — requested time first, then nearest times; closest
+       venue first within a time — loading each venue's availability only when needed. Stops on
+       the first booking, or when every acceptable slot was refused ("rejection").
+    Network errors are logged once and retried until `retry_for` after opening.
     """
-    venues = [r.venue for r in plan.venues]
-    if not venues:
+    if not plan.venues:
         return RaceReport(None, "", (), "no venue in bike range")
+    day = plan.window.preferred.date()
+    journal = _Journal(clock)
 
     await sleep_until(clock, plan.opens_at - timing.poll_start, chunk=timing.poll_every)
     deadline = max(plan.opens_at, clock.now()) + timing.retry_for
-    attempts: list[Attempt] = []
-    refused: set[tuple[str, datetime]] = set()
-    last_error = ""
 
-    while True:
-        try:
-            free = await session.free_slots(plan.window.preferred.date(), venues)
-        except Exception as e:  # overloaded server right at opening is normal; keep polling
-            free = []
-            if (error := f"{type(e).__name__}: {e}") != last_error:
-                attempts.append(Attempt(clock.now(), "availability", None, Outcome.ERROR, error))
-                last_error = error
-
-        for slot in candidates(free, plan.venues, plan.window):
-            if (slot.venue.id, slot.start) in refused:
-                continue
-            try:
-                result = await session.book(slot)
-            except Exception as e:
-                result = BookingResult(Outcome.ERROR, f"{type(e).__name__}: {e}")
-            attempts.append(Attempt(clock.now(), slot.venue.name, slot.start, result.outcome, result.detail))
-            if result.outcome is Outcome.BOOKED:
-                return RaceReport(slot, result.reference, tuple(attempts))
-            if result.outcome is Outcome.TAKEN:
-                refused.add((slot.venue.id, slot.start))
-
+    while not await journal.call("opening check", session.is_open(day, plan.venues[0].venue), False):
         if clock.now() >= deadline:
-            reason = "every acceptable slot was taken" if refused else "no acceptable slot was offered"
-            return RaceReport(None, "", tuple(attempts), reason)
+            return journal.report("the booking window did not open in time")
         await clock.sleep(timing.poll_every)
+
+    known: dict[str, list[Slot]] = {}
+    refused: set[tuple[str, str, datetime]] = set()
+    while clock.now() < deadline:
+        slot = await _next_candidate(session, day, plan, known, refused, journal)
+        if slot is None:
+            if len(known) == len(plan.venues):
+                reason = "every acceptable slot was taken" if refused else "no acceptable slot was free"
+                return journal.report(reason)
+            await clock.sleep(timing.poll_every)  # a venue failed to load; try again
+            continue
+        result = await journal.book(session, slot)
+        if result.outcome is Outcome.BOOKED:
+            return journal.report("", slot, result.reference)
+        if result.outcome is Outcome.TAKEN:
+            refused.add((slot.venue.id, slot.court, slot.start))
+        else:
+            await clock.sleep(timing.poll_every)
+    return journal.report("gave up: retry window closed")
+
+
+async def _next_candidate(
+    session: ProviderSession,
+    day: date,
+    plan: Plan,
+    known: dict[str, list[Slot]],
+    refused: set[tuple[str, str, datetime]],
+    journal: "_Journal",
+) -> Slot | None:
+    """Best free slot, loading venues closest-first until no further venue could beat it."""
+
+    def best() -> Slot | None:
+        free = [s for slots in known.values() for s in slots if (s.venue.id, s.court, s.start) not in refused]
+        ordered = candidates(free, plan.venues, plan.window)
+        return ordered[0] if ordered else None
+
+    for ranked in plan.venues:
+        if (top := best()) and abs(top.start - plan.window.preferred) <= IDEAL:
+            return top
+        if ranked.venue.id not in known:
+            slots = await journal.call(ranked.venue.name, session.free_slots(day, ranked.venue), None)
+            if slots is None:
+                return None
+            known[ranked.venue.id] = slots
+    return best()
+
+
+class _Journal:
+    """Attempts made during a race; errors are recorded once per distinct message."""
+
+    def __init__(self, clock: Clock):
+        self._clock = clock
+        self.attempts: list[Attempt] = []
+        self._last_error = ""
+
+    async def call(self, what: str, step: Awaitable[T], default: T) -> T:
+        try:
+            return await step
+        except NotImplementedError:
+            raise
+        except Exception as e:  # an overloaded server right at opening is normal; keep going
+            if (error := f"{what}: {type(e).__name__}: {e}") != self._last_error:
+                self.attempts.append(Attempt(self._clock.now(), what, None, Outcome.ERROR, error))
+                self._last_error = error
+            return default
+
+    async def book(self, session: ProviderSession, slot: Slot) -> BookingResult:
+        try:
+            result = await session.book(slot)
+        except NotImplementedError:
+            raise
+        except Exception as e:
+            result = BookingResult(Outcome.ERROR, f"{type(e).__name__}: {e}")
+        self.attempts.append(
+            Attempt(self._clock.now(), slot.label, slot.start, result.outcome, result.detail)
+        )
+        return result
+
+    def report(self, reason: str, booked: Slot | None = None, reference: str = "") -> RaceReport:
+        return RaceReport(booked, reference, tuple(self.attempts), reason)
 
 
 class RaceService:
@@ -146,7 +211,7 @@ class RaceService:
         slot = report.booked
         result: dict[str, Any] = (
             {
-                "venue": slot.venue.name,
+                "venue": slot.label,
                 "address": slot.venue.address,
                 "start": slot.start.isoformat(),
                 "end": slot.end.isoformat(),

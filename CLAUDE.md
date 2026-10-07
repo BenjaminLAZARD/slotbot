@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 Read **HISTORY.md** first (latest entry + open items), then README.md. At the end of each session,
-append a dated entry to HISTORY.md: what changed, why, what was verified, open items.
+add a dated entry at the top of HISTORY.md: what changed, why, what was verified, open items.
 
 ## Ground rules
 - Ask Benjamin before choosing frameworks, infra or paid services; propose options with a recommendation.

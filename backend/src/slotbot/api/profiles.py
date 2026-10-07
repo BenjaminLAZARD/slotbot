@@ -1,10 +1,20 @@
+from datetime import timedelta
+
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 
 from slotbot.api.deps import DB, C
 from slotbot.domain.ranking import nearby
 from slotbot.models import Booking, BookingStatus, Profile
-from slotbot.schemas import BookingOut, CredentialsIn, ProfileConfig, ProfileIn, ProfileOut, VenueOut
+from slotbot.schemas import (
+    BookingOut,
+    CredentialsIn,
+    LoginCheckOut,
+    ProfileConfig,
+    ProfileIn,
+    ProfileOut,
+    VenueOut,
+)
 
 router = APIRouter(prefix="/api/profiles", tags=["profiles"])
 
@@ -58,6 +68,29 @@ async def set_credentials(profile_id: int, body: CredentialsIn, db: DB, c: C) ->
         raise HTTPException(422, f"missing: {', '.join(missing)}")
     profile.credentials = c.vault.seal({f: body.values[f] for f in provider.credential_fields})
     await db.commit()
+
+
+@router.post("/{profile_id}/check-login")
+async def check_login(profile_id: int, db: DB, c: C) -> LoginCheckOut:
+    """Log in with the stored credentials and read the closest venue's furthest open day. Books nothing."""
+    profile = await _load(db, profile_id)
+    cfg = ProfileConfig.model_validate(profile.config)
+    provider = c.providers.get(cfg.provider)
+    if provider.credential_fields and not profile.credentials:
+        raise HTTPException(422, "store the booking-site credentials first")
+    point = await c.geocoder.locate(cfg.home) if cfg.home else None
+    venues = await c.catalogue.get(provider)
+    ranked = nearby(venues, point, cfg.max_bike_minutes, kmh=cfg.bike_kmh) if point else ()
+    venue = ranked[0].venue if ranked else venues[0]
+    day = c.clock.now().astimezone(provider.tz).date() + timedelta(days=6)
+    creds = c.vault.open(profile.credentials) if profile.credentials else {}
+    try:
+        async with provider.session(creds) as session:
+            is_open = await session.is_open(day, venue)
+            free = await session.free_slots(day, venue) if is_open else []
+    except Exception as e:
+        raise HTTPException(502, f"{type(e).__name__}: {e}") from None
+    return LoginCheckOut(venue=venue.name, day=day, open=is_open, free_slots=len(free))
 
 
 @router.get("/{profile_id}/venues")

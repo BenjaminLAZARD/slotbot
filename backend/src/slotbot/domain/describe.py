@@ -60,7 +60,7 @@ def result_lines(plan: Plan, report: RaceReport) -> list[str]:
     if report.booked:
         slot = report.booked
         ref = f" (ref {report.reference})" if report.reference else ""
-        head = f"Result: BOOKED {slot.venue.name} · {_day(slot.start)}–{_hm(slot.end)}{ref}"
+        head = f"Result: BOOKED {slot.label} · {_day(slot.start)}–{_hm(slot.end)}{ref}"
     else:
         head = f"Result: FAILED · {report.reason or 'no acceptable slot'}"
     status = "booked" if report.booked else "failed"

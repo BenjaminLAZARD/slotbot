@@ -32,4 +32,5 @@ class Settings(BaseSettings):
 
     local_sync_minutes: int = 60  # local mode only: how often to re-read calendars
 
-    madrid_opens_at: str = "00:00"  # hour the D-6 slots open (to be confirmed against the live site)
+    madrid_opens_at: str = "00:00"  # hour the D-6 slots open (scripts/probe_madrid_opening.py measures it)
+    madrid_request_light: bool = True  # when the site asks "with floodlights?" (paid extra), answer yes

@@ -48,7 +48,7 @@ def build_container(settings: Settings, http: httpx.AsyncClient) -> Container:
     calendar = GoogleCalendar(http, google)
     agent = f"slotbot/0.1 ({settings.contact_email or 'self-hosted'})"
     geocoder = Nominatim(http, agent)
-    providers = build_registry(http, settings)
+    providers = build_registry(http, geocoder, settings)
     vault = Vault(settings.secret_key)
     catalogue = VenueCatalogue(sessions, clock)
     planner = Planner(geocoder, catalogue)
