@@ -41,13 +41,19 @@ entry at the top at the end of each working session.
   the push identity.
 
 ### Open items
-1. **Opening hour**: the probe for 15 Oct is still running on the Mac (`.probe-opening.log`). Then
-   set `SLOTBOT_MADRID_OPENS_AT` in Cloud Run (`gcloud run services update … --update-env-vars`) and `.env`.
+1. **Opening hour, per centre.** The probe watched facility 10, which is **La Chopera**: 15 Oct was
+   bookable there by 22:06 on 8 Oct (the Mac slept on battery before that, so no exact time). At
+   22:35 every other centre (Concepción, La Elipa, Eva Duarte, Torrespaña included) still ended at
+   14 Oct. So the windows differ per centre, and a single probe centre can mislead. For Benjamin's
+   centres "D−6 at 00:00" is still the working assumption: tonight's cloud race (Thu 15 Oct 19:00,
+   wakes 23:55, gives up 00:02 if closed) is the measurement; read its attempts in the event.
 2. **First race in the cloud** (Cloud Tasks → `/jobs/race/{id}`) not yet seen: needs a candidate.
    Use one ≥ 4 days ahead (free cancellation) and ask Benjamin before a real booking.
 3. Kill switch tested only below the cap (detaching billing for real would stop the bot).
 4. CD: GitHub Actions + Workload Identity Federation (deploy on push to main). Until then, redeploy
    by hand (deploy/gcp.md §5).
+   Nothing runs on the Mac any more: probe and `caffeinate` ended, the docker stack (db too) is
+   stopped, no cron / launchd / Claude schedules. `deploy/bot.sh pause|resume|status|ui` controls the cloud bot.
 5. Every cold start runs `alembic upgrade head`, which wakes Neon, and budget pushes arrive
    several times a day. Expected within Neon's free compute; check Neon's usage page after a week,
    else run migrations in CD instead of at start.

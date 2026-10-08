@@ -171,6 +171,12 @@ gcloud run services proxy slotbot --project $PROJECT --region $REGION --port 809
 Stop the local `docker compose` API when the cloud takes over: two bots would race each other for
 the same slot (the `db` container can stay).
 
+## Pause / resume
+
+`deploy/bot.sh pause` pauses the hourly scan and the race queue (Cloud Run only runs when called, so
+the bot is then fully stopped and costs nothing); `resume` restarts both, and queued races that
+came due meanwhile fire at once. `status` shows both and the queued races; `ui` opens the proxy.
+
 ## Logs
 
 ```bash
