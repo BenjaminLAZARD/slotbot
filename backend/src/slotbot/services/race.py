@@ -36,6 +36,7 @@ class Timing:
 
 # A free slot this close to the requested time can't be beaten by checking further venues.
 IDEAL = timedelta(minutes=30)
+MAX_VENUE_FAILURES = 3
 
 
 async def run_race(plan: Plan, session: ProviderSession, clock: Clock, timing: Timing) -> RaceReport:
@@ -71,8 +72,9 @@ async def _race(
 
     known: dict[str, list[Slot]] = {}
     refused: set[tuple[str, str, datetime]] = set()
+    failures: dict[str, int] = {}
     while clock.now() < deadline:
-        slot = await _next_candidate(session, day, plan, known, refused, journal)
+        slot = await _next_candidate(session, day, plan, known, refused, failures, journal)
         if slot is None:
             if len(known) == len(plan.venues):
                 reason = "every acceptable slot was taken" if refused else "no acceptable slot was free"
@@ -95,9 +97,13 @@ async def _next_candidate(
     plan: Plan,
     known: dict[str, list[Slot]],
     refused: set[tuple[str, str, datetime]],
+    failures: dict[str, int],
     journal: "_Journal",
 ) -> Slot | None:
-    """Best free slot, loading venues closest-first until no further venue could beat it."""
+    """Best free slot, loading venues closest-first until no further venue could beat it.
+
+    A venue that fails to load is retried on the next pass, and skipped after MAX_VENUE_FAILURES.
+    """
 
     def best() -> Slot | None:
         free = [s for slots in known.values() for s in slots if (s.venue.id, s.court, s.start) not in refused]
@@ -107,11 +113,15 @@ async def _next_candidate(
     for ranked in plan.venues:
         if (top := best()) and abs(top.start - plan.window.preferred) <= IDEAL:
             return top
-        if ranked.venue.id not in known:
+        venue_id = ranked.venue.id
+        if venue_id not in known:
             slots = await journal.call(ranked.venue.name, session.free_slots(day, ranked.venue), None)
             if slots is None:
-                return None
-            known[ranked.venue.id] = slots
+                failures[venue_id] = failures.get(venue_id, 0) + 1
+                if failures[venue_id] < MAX_VENUE_FAILURES:
+                    return None  # the caller waits a beat and tries again
+                slots = []  # give up on this venue for this race
+            known[venue_id] = slots
     return best()
 
 

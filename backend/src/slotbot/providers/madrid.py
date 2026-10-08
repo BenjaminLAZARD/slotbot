@@ -144,27 +144,31 @@ class MadridSession:
         self._facility = self._loaded = None  # the next step leaves the tennis page
         if not reserved.redirect:
             alert = alert_text(reserved) or "refused by the site"
-            if re.search(r"identific|suspendid|suspensi", alert, re.I):  # not about this slot: stop
+            # Not about this slot (signed out, suspended, daily limit): every other try would fail too.
+            if re.search(r"identific|suspendid|suspensi|no se permiten m", alert, re.I):
                 raise AbortRace(f"the site refused the account: {alert}")
             return BookingResult(Outcome.TAKEN, alert)
         await self._web.follow(reserved)
 
+        # From here an unpaid reservation sits in the cart and blocks further selections, so any
+        # reason not to pay ends the race: never pile up reservations the bot won't pay for.
         cart = parse_cart(self._web.html)
         if cart.items != 1 or cell.start not in cart.texts:
-            return BookingResult(Outcome.ERROR, f"unexpected cart ({cart.items} items): not paying")
+            raise AbortRace(
+                f"the cart holds {cart.items} items, not just ours: nothing paid, check deportesweb"
+            )
         if cart.wallet is None or cart.total is None or cart.wallet < cart.total:
-            return BookingResult(
-                Outcome.ERROR,
-                f"wallet {cart.wallet} € < price {cart.total} €: slot left in your deportesweb cart",
+            raise AbortRace(
+                f"wallet {cart.wallet} € < price {cart.total} €: the slot waits unpaid in your cart"
             )
 
         paid = await self._web.confirm_cart(WALLET)
         if not paid.redirect:
-            return BookingResult(Outcome.ERROR, f"payment refused: {alert_text(paid) or 'no confirmation'}")
+            raise AbortRace(f"payment refused: {alert_text(paid) or 'no confirmation'}")
         await self._web.follow(paid)
         texts = page_texts(self._web.html)
         if "Confirmado" not in texts:
-            return BookingResult(Outcome.ERROR, "payment not confirmed; check deportesweb")
+            raise AbortRace("payment not confirmed: check deportesweb")
         # The cart number is what cancelling needs (Consultar {cartCode} -> RefundCart).
         cart_code = next((texts[i + 1] for i, t in enumerate(texts[:-1]) if t == "Carrito"), "")
         left = cart.wallet - cart.total

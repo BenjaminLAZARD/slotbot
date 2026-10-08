@@ -108,6 +108,23 @@ async def test_an_account_problem_stops_the_race_at_once(clock):
     assert len(report.attempts) == 1  # no burst of retries on other courts/times
 
 
+async def test_a_venue_that_keeps_failing_is_skipped_not_retried_for_minutes(clock):
+    class Broken(Session):
+        async def free_slots(self, day: date, venue: Venue) -> list[Slot]:
+            self.loaded.append(venue.id)
+            if venue.id == "a":
+                raise ValueError("page changed")
+            return await super().free_slots(day, venue)
+
+    clock.current = OPENS
+    session = Broken(clock, taken=set())
+    report = await run_race(plan(), session, clock, TIMING)
+
+    assert report.booked and report.booked.venue.id == "b"
+    assert session.loaded.count("a") == 3  # three tries, then skipped
+    assert clock.now() < OPENS + timedelta(seconds=5)
+
+
 async def test_gives_up_if_the_window_never_opens(clock):
     clock.current = OPENS
     report = await run_race(plan(), Session(clock, taken=set(), opens=None), clock, TIMING)

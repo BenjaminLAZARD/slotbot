@@ -36,6 +36,12 @@ def test_cart_page_reads_items_total_and_wallet_balance():
     )
     cart = parse_cart(page)
     assert (cart.items, cart.total, cart.wallet) == (1, 6.9, 10.0)
+    # Real pages write each item twice (two layouts) but give it one code: count codes.
+    twice = (
+        "$a.append('Inicio'); $b.append('Inicio');"
+        "f({ cart_item_code: '162248182' }); g({cart_item_code:'162248182'})"
+    )
+    assert parse_cart(twice).items == 1
     assert "16:30" in cart.texts
     assert parse_cart("$a.append('Total'); $b.append('6,90 €')").wallet is None  # wallet not offered
 

@@ -105,6 +105,7 @@ def page_texts(page_html: str) -> list[str]:
 
 
 _PERSON = re.compile(r'person_code\\?"\s*:\s*\\?"([^"\\]+)')
+_ITEM_CODE = re.compile(r"""cart_item_code['"]?\s*:\s*['"]?(\d+)""")
 
 
 def person_code(text: str) -> str | None:
@@ -124,7 +125,10 @@ def parse_cart(page_html: str) -> Cart:
     def after(label: str) -> str | None:
         return next((texts[i + 1] for i, t in enumerate(texts[:-1]) if t == label), None)
 
-    return Cart(texts.count("Inicio"), euros(after("Total")), euros(after("Saldo disponible")), tuple(texts))
+    # Each item has one code but is written twice in the page's script (two layouts), so count codes.
+    codes = set(_ITEM_CODE.findall(page_html))
+    items = len(codes) if codes else (texts.count("Inicio") + 1) // 2
+    return Cart(items, euros(after("Total")), euros(after("Saldo disponible")), tuple(texts))
 
 
 def parse_delta(text: str) -> Delta:
@@ -338,6 +342,8 @@ class DeportesWeb:
                 },
             },
         )
+        if "reservationType:" not in delta.text:  # e.g. an unpaid cart blocks new selections
+            raise SiteError(alert_text(delta) or f"centre {facility_code} offered no tennis usage")
         return json_after(delta.text, "reservationType:")
 
     async def select_usage(self, usage: dict[str, Any]) -> None:
