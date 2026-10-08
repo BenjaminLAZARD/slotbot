@@ -6,6 +6,34 @@ entry at the top at the end of each working session.
 
 ---
 
+## 2026-10-08 (noon) · v0.5: first real end-to-end booking, after four bugs
+
+**Result:** the bot booked La Elipa · Tenis 3, Mon 12 Oct 19:00–20:00, €6.90 from the wallet (cart
+8126141481), in one attempt; calendar updated to "Success - Tennis".
+
+### Incidents (all fixed, with tests)
+1. **Not signed in at "Reservar".** The person code (sent with every reservation) arrives in the
+   centre-selection response (`$('.cronos-reservations').data('profile', {...})`), not in full pages;
+   the bot never captured it → "Para acceder a este servicio es necesario identificarse" on 22
+   attempts, mislabelled "taken". Now read from every response; Reservar refused without it; login
+   verified ("MiCuenta"); "identificarse"/suspension/"No se permiten más de 2 reservas" → `AbortRace`.
+2. **Cart miscount → unpaid reservations left behind.** Each cart item is written twice in the
+   page's script; the bot counted 2 for 1, refused to pay, and kept reserving (2 unpaid items, the
+   per-day limit reached). Unpaid carts **expire after ~10 min** and release the courts. Now: count
+   by `cart_item_code`; any reason not to pay after Reservar aborts the race.
+3. **Venue retried for 2 min.** With an unpaid cart open, SelectFacility returns no usage; the bot
+   retried every second. Now a venue is skipped after 3 failures, and the site's message is shown.
+4. **Triggers due "now" raced the database.** Retry scheduled before committing "pending" (race:
+   "not pending; skipping"); sync wrote "Pending" to the calendar after scheduling (could overwrite
+   the result). Now: commit → calendar → schedule. Regression test with an immediately-firing trigger.
+
+### Notes
+- Dev hot reload kills in-flight races; harmless in prod (no reload), but avoid editing during a race.
+- The test email was accepted by Resend (200); mail from onboarding@resend.dev may land in spam.
+- Benjamin's tennis calendar has its own time zone at UTC−5 (instants are right; display may not be).
+
+---
+
 ## 2026-10-08 (late morning) · v0.4: setup checks, unsaved-changes bar, email notifications
 
 ### Why
