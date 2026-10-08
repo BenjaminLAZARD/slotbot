@@ -11,7 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from slotbot.api import bookings, jobs, meta, profiles
+from slotbot.api import agenda, bookings, jobs, meta, profiles
 from slotbot.container import build_container
 from slotbot.errors import ConfigError
 from slotbot.settings import Settings
@@ -34,7 +34,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await container.engine.dispose()
 
     app = FastAPI(title="slotbot", lifespan=lifespan)
-    for module in (profiles, bookings, jobs, meta):
+    for module in (profiles, agenda, bookings, jobs, meta):
         app.include_router(module.router)
 
     @app.exception_handler(ConfigError)

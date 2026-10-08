@@ -172,6 +172,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/profiles/{profile_id}/agenda": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Agenda
+         * @description The next events in the calendar with their stage, booking opening and bot wake-up times.
+         */
+        get: operations["agenda_api_profiles__profile_id__agenda_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profiles/{profile_id}/events/{event_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel
+         * @description Stop the bot for this event; a paid booking is cancelled on the site (refund to the wallet).
+         */
+        post: operations["cancel_api_profiles__profile_id__events__event_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profiles/{profile_id}/events/{event_id}/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset
+         * @description Turn the event back into a fresh candidate; the bot plans it again (and races if open).
+         */
+        post: operations["reset_api_profiles__profile_id__events__event_id__reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/bookings/{booking_id}/retry": {
         parameters: {
             query?: never;
@@ -250,6 +310,50 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ActionOut */
+        ActionOut: {
+            /** Detail */
+            detail: string;
+        };
+        /** AgendaEventOut */
+        AgendaEventOut: {
+            /** Event Id */
+            event_id: string;
+            /** Title */
+            title: string;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            /** Location */
+            location: string;
+            /** Stage */
+            stage: string;
+            /** Booking Id */
+            booking_id: number | null;
+            /** Opens At */
+            opens_at: string | null;
+            /** Wakes At */
+            wakes_at: string | null;
+            /** Court */
+            court: string | null;
+            /** Actions */
+            actions: string[];
+        };
+        /** AgendaOut */
+        AgendaOut: {
+            /** Events */
+            events: components["schemas"]["AgendaEventOut"][];
+            next_wake: components["schemas"]["AgendaEventOut"] | null;
+            /** Next Sync */
+            next_sync: string | null;
+        };
         /** BookingOut */
         BookingOut: {
             /** Id */
@@ -395,7 +499,8 @@ export interface components {
              *       "candidate": "Candidate Tennis",
              *       "pending": "Pending Tennis",
              *       "success": "Success - Tennis",
-             *       "failure": "Failure - Tennis"
+             *       "failure": "Failure - Tennis",
+             *       "cancelled": "Cancelled - Tennis"
              *     }
              */
             titles: components["schemas"]["Titles"];
@@ -465,6 +570,11 @@ export interface components {
              * @default Failure - Tennis
              */
             failure: string;
+            /**
+             * Cancelled
+             * @default Cancelled - Tennis
+             */
+            cancelled: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -855,6 +965,101 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BookingOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    agenda_api_profiles__profile_id__agenda_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgendaOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_api_profiles__profile_id__events__event_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: number;
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_api_profiles__profile_id__events__event_id__reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: number;
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionOut"];
                 };
             };
             /** @description Validation Error */

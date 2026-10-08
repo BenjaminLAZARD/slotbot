@@ -21,11 +21,19 @@ def has_marker(title: str, marker: str) -> bool:
 
 
 def retitle(title: str, new: str, *olds: str) -> str:
-    """Swap the first stage marker found ('Candidate Tennis w/ Ana' -> 'Pending Tennis w/ Ana')."""
+    """Swap the first stage marker found ('Candidate Tennis w/ Ana' -> 'Pending Tennis w/ Ana').
+
+    A title without any marker keeps its text: 'Tennis w/ Ana' -> 'Candidate Tennis · Tennis w/ Ana'.
+    """
     for old in olds:
         if (i := title.lower().find(old.lower())) >= 0:
             return title[:i] + new + title[i + len(old) :]
-    return new
+    return f"{new} · {title}" if title.strip() else new
+
+
+def stage_of(title: str, markers: dict[str, str]) -> str | None:
+    """Which stage marker ({stage: marker}) the title carries, if any."""
+    return next((stage for stage, marker in markers.items() if has_marker(title, marker)), None)
 
 
 def user_part(description: str) -> str:

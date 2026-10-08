@@ -50,6 +50,14 @@ MENU_ANONYMOUS = {
 }
 GRID_FIELD = "ctl00$ContentFixedSection$uReservaEspacios$uReservaCuadrante$hdnCuadrante"
 MENU_RACKET_SPORTS = {"menu_code": "8597", "menu_title": "Deportes de raqueta"}
+MENU_MY_RENTALS = {
+    "menu_code": "8844",
+    "menu_title": "Alquileres de unidades deportivas",
+    "menu_type": 39,
+    "authentication_provider_code": None,
+    "submenu_code": None,
+}  # on the account page
+_RENTAL_CARD = "ContentSection_uAlquileres_uCarritosFicha_uAlert_uplAlert"
 TENNIS_MENU_CODE = "8598"
 TENNIS_ACTIVITY = {"activity_code": "605", "activity_name": "TENIS"}
 # Payment methods on the cart page: card 10/25, Bizum 23/30, wallet ("monedero") 5/5.
@@ -390,6 +398,39 @@ class DeportesWeb:
             },
             extra={GRID_FIELD: f"+{cell.court_code}#{cell.start}#{flag};"},
         )
+
+    async def cancel_rental(self, cart_code: str) -> str:
+        """Cancel a paid rental from the account's rentals list; the site refunds the wallet.
+
+        Account → "Alquileres de unidades deportivas" → Consultar {cartCode} → RefundCart, first
+        without then with `ignorarAdvertencia` (the site's "are you sure?" step). Captured 2026-10-08.
+        """
+        await self.follow(await self.postback("uAlert_uplAlert", {"action": "MiCuenta"}))
+        await self.follow(
+            await self.postback(
+                "ContentFixedSection_uSecciones_uAlert_uplAlert",
+                {"action": "SelectMenu", "args": MENU_MY_RENTALS},
+            )
+        )
+        consult = {
+            "controlID": "ContentSection_uAlquileres",
+            "action": "Consultar",
+            "args": {"cartCode": int(cart_code)},
+        }
+        before = page_texts((await self.postback("uAlert_uplAlert", consult)).text)
+        if "Anulado" in before:
+            return f"cart {cart_code} was already cancelled"
+        for confirmed in (False, True):
+            delta = await self.postback(
+                _RENTAL_CARD, {"action": "RefundCart", "args": {"ignorarAdvertencia": confirmed}}
+            )
+            if alert := alert_text(delta):  # e.g. too close to the start time
+                raise SiteError(alert)
+        after = page_texts((await self.postback("uAlert_uplAlert", consult)).text)
+        if "Anulado" not in after:
+            raise SiteError(f"cart {cart_code} still not cancelled: check deportesweb")
+        refund = next((t for t in after if t.startswith("Devolución")), "")
+        return f"cancelled on deportesweb (cart {cart_code}); {refund or 'refund'} to the wallet"
 
     async def confirm_cart(self, payment: dict[str, str]) -> Delta:
         """Press "Confirmar la compra" on the cart page; on success the site redirects to the result."""

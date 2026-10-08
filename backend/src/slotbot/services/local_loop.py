@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -30,6 +30,7 @@ class LocalLoop:
         self._clock = clock
         self._every = every
         self._task: asyncio.Task[None] | None = None
+        self.next_sync: datetime | None = None  # shown in the UI
 
     def start(self) -> None:
         self._task = asyncio.create_task(self._run())
@@ -45,7 +46,8 @@ class LocalLoop:
                 await self._sync.sync_all()
             except Exception:
                 log.exception("periodic sync failed")
-            await sleep_until(self._clock, self._clock.now() + self._every)
+            self.next_sync = self._clock.now() + self._every
+            await sleep_until(self._clock, self.next_sync)
 
     async def _rearm(self) -> None:
         """In-process timers die with the process; recreate one per pending booking."""

@@ -1,10 +1,11 @@
 import { Fragment, useState } from 'react'
-import { RefreshCwIcon, RotateCcwIcon } from 'lucide-react'
+import { RotateCcwIcon } from 'lucide-react'
 import type { Booking } from '@/api/client'
-import { useBookings, useRetry, useSync } from '@/api/hooks'
+import { useBookings, useRetry } from '@/api/hooks'
+import { UpcomingPanel } from '@/components/UpcomingPanel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { clock, fromNow, when } from '@/lib/format'
 
@@ -18,44 +19,11 @@ const STATUS: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'
 
 export function BookingsPanel({ profileId }: { profileId: number }) {
   const bookings = useBookings(profileId)
-  const sync = useSync(profileId)
   const rows = bookings.data ?? []
-  const next = rows.filter((b) => b.status === 'pending' || b.status === 'racing').at(-1)
 
   return (
     <div className="grid gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Next booking</CardTitle>
-          <CardDescription>
-            The bot reads your calendar daily, picks the next candidate event and wakes up a few minutes
-            before its booking window opens.
-          </CardDescription>
-          <CardAction>
-            <Button variant="outline" size="sm" disabled={sync.isPending} onClick={() => sync.mutate(false)}>
-              <RefreshCwIcon className={sync.isPending ? 'animate-spin' : ''} />
-              Sync calendar now
-            </Button>
-          </CardAction>
-        </CardHeader>
-        <CardContent>
-          {next ? (
-            <dl className="grid gap-4 sm:grid-cols-3">
-              <Fact label="Event" value={next.title} hint={when(next.play_start)} />
-              <Fact label="Booking opens" value={when(next.opens_at)} hint={fromNow(next.opens_at)} />
-              <Fact
-                label="Bot wakes up"
-                value={when(next.trigger_at)}
-                hint={next.status === 'racing' ? 'racing now…' : fromNow(next.trigger_at)}
-              />
-            </dl>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Nothing planned. Add an event whose title contains your candidate marker, then sync.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      <UpcomingPanel profileId={profileId} />
 
       <Card>
         <CardHeader>
@@ -74,15 +42,6 @@ export function BookingsPanel({ profileId }: { profileId: number }) {
   )
 }
 
-function Fact({ label, value, hint }: { label: string; value: string; hint: string }) {
-  return (
-    <div>
-      <dt className="text-xs text-muted-foreground uppercase">{label}</dt>
-      <dd className="font-medium">{value}</dd>
-      <dd className="text-sm text-muted-foreground">{hint}</dd>
-    </div>
-  )
-}
 
 function HistoryTable({ rows, profileId }: { rows: Booking[]; profileId: number }) {
   const [open, setOpen] = useState<number | null>(null)

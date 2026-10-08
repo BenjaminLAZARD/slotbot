@@ -29,6 +29,7 @@ const DEFAULTS: ProfileConfig = {
     pending: 'Pending Tennis',
     success: 'Success - Tennis',
     failure: 'Failure - Tennis',
+    cancelled: 'Cancelled - Tennis',
   },
   lookahead_days: 30,
   notify_email: '',
@@ -125,8 +126,8 @@ export function ProfileSettings({ profile, onSaved, onDeleted }: Props) {
           </div>
 
           <Separator />
-          <div className="grid gap-4 sm:grid-cols-4">
-            {(['candidate', 'pending', 'success', 'failure'] as const).map((k) => (
+          <div className="grid gap-4 sm:grid-cols-5">
+            {(['candidate', 'pending', 'success', 'failure', 'cancelled'] as const).map((k) => (
               <Field key={k} label={`${k[0].toUpperCase()}${k.slice(1)} title`}>
                 <Input
                   value={cfg.titles[k]}

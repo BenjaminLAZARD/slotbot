@@ -15,6 +15,7 @@ from slotbot.adapters.triggers import CloudTasksTriggers, LocalTriggers
 from slotbot.adapters.vault import Vault
 from slotbot.ports import Calendar, Clock, Geocoder, Notifier, Triggers
 from slotbot.providers import ProviderRegistry, build_registry
+from slotbot.services.agenda import AgendaService
 from slotbot.services.local_loop import LocalLoop
 from slotbot.services.planner import Planner
 from slotbot.services.race import RaceService, Timing
@@ -38,6 +39,7 @@ class Container:
     catalogue: VenueCatalogue
     sync: SyncService
     race: RaceService
+    agenda: AgendaService
     notifier: Notifier | None
     local_loop: LocalLoop | None
 
@@ -86,6 +88,18 @@ def build_container(settings: Settings, http: httpx.AsyncClient) -> Container:
         every = timedelta(minutes=settings.local_sync_minutes)
         local_loop = LocalLoop(sessions, triggers, sync, clock, every)
 
+    loop = local_loop
+    agenda = AgendaService(
+        sessions,
+        calendar,
+        providers,
+        vault,
+        triggers,
+        clock,
+        sync,
+        next_sync=lambda: loop.next_sync if loop else None,  # Cloud Scheduler: not known here
+    )
+
     return Container(
         settings=settings,
         engine=engine,
@@ -100,6 +114,7 @@ def build_container(settings: Settings, http: httpx.AsyncClient) -> Container:
         catalogue=catalogue,
         sync=sync,
         race=race,
+        agenda=agenda,
         notifier=notifier,
         local_loop=local_loop,
     )

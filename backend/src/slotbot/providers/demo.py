@@ -63,3 +63,6 @@ class DemoSession:
             self._refused_once = True
             return BookingResult(Outcome.TAKEN, "demo: someone was faster")
         return BookingResult(Outcome.BOOKED, reference=f"demo-{slot.ref}")
+
+    async def cancel(self, reference: str) -> str:
+        return f"demo: {reference} cancelled (nothing was booked)"

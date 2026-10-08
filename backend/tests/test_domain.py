@@ -90,4 +90,6 @@ def test_notification_flags_a_wallet_that_cannot_pay_the_next_booking():
 
 def test_retitle_keeps_the_rest_of_the_title():
     assert retitle("Candidate Tennis w/ Ana", "Pending Tennis", "candidate tennis") == "Pending Tennis w/ Ana"
-    assert retitle("Something else", "Success - Tennis", "Pending Tennis") == "Success - Tennis"
+    assert (
+        retitle("Tennis w/ Ana", "Candidate Tennis", "Pending Tennis") == "Candidate Tennis · Tennis w/ Ana"
+    )

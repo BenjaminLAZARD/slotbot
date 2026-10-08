@@ -270,12 +270,13 @@ class RaceService:
             else {"reason": report.reason}
         )
         status = BookingStatus.BOOKED if slot else BookingStatus.FAILED
-        await self._save(booking_id, status, result, report.attempts)
-
         t = cfg.titles
         event = plan.event
+        title = retitle(event.title, t.success if slot else t.failure, *t.all())
+        await self._save(booking_id, status, result, report.attempts, title)
+
         changes = EventChanges(
-            title=retitle(event.title, t.success if slot else t.failure, t.pending, t.candidate, t.failure),
+            title=title,
             description=compose(event.description, result_lines(plan, report)),
             location=f"{slot.venue.name}, {slot.venue.address}" if slot else None,
             start=slot.start if slot else None,
@@ -287,7 +288,12 @@ class RaceService:
             log.exception("could not write the race result to the calendar (booking %s)", booking_id)
 
     async def _save(
-        self, booking_id: int, status: BookingStatus, result: dict[str, Any], attempts: tuple[Attempt, ...]
+        self,
+        booking_id: int,
+        status: BookingStatus,
+        result: dict[str, Any],
+        attempts: tuple[Attempt, ...],
+        title: str | None = None,
     ) -> None:
         rows = [
             {
@@ -299,10 +305,14 @@ class RaceService:
             }
             for a in attempts
         ]
+        values: dict[str, Any] = {
+            "status": status,
+            "result": result,
+            "attempts": rows,
+            "updated_at": utcnow(),
+        }
+        if title is not None:  # History shows the event as it now reads in the calendar
+            values["title"] = title
         async with self._sessions() as db:
-            await db.execute(
-                update(Booking)
-                .where(Booking.id == booking_id)
-                .values(status=status, result=result, attempts=rows, updated_at=utcnow())
-            )
+            await db.execute(update(Booking).where(Booking.id == booking_id).values(**values))
             await db.commit()

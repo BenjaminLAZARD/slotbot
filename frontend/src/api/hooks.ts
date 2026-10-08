@@ -139,6 +139,36 @@ export function useCheckLogin(profileId: number) {
   })
 }
 
+export const useAgenda = (profileId: number) =>
+  useQuery({
+    queryKey: ['agenda', profileId],
+    queryFn: () =>
+      call(api.GET('/api/profiles/{profile_id}/agenda', { params: { path: { profile_id: profileId } } })),
+    refetchInterval: 30_000,
+  })
+
+export function useEventAction(profileId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ eventId, action }: { eventId: string; action: 'cancel' | 'reset' }) =>
+      call(
+        action === 'cancel'
+          ? api.POST('/api/profiles/{profile_id}/events/{event_id}/cancel', {
+              params: { path: { profile_id: profileId, event_id: eventId } },
+            })
+          : api.POST('/api/profiles/{profile_id}/events/{event_id}/reset', {
+              params: { path: { profile_id: profileId, event_id: eventId } },
+            }),
+      ),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ['agenda', profileId] })
+      qc.invalidateQueries({ queryKey: keys.bookings(profileId) })
+      toast.success(r.detail)
+    },
+    onError: (e: Error) => toast.error(e.message, { duration: 15_000 }),
+  })
+}
+
 export function useTestNotification(profileId: number) {
   return useMutation({
     mutationFn: () =>

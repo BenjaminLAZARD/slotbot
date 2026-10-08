@@ -20,12 +20,16 @@ class Titles(BaseModel):
     pending: str = "Pending Tennis"
     success: str = "Success - Tennis"
     failure: str = "Failure - Tennis"
+    cancelled: str = "Cancelled - Tennis"
+
+    def all(self) -> tuple[str, ...]:
+        return (self.candidate, self.pending, self.success, self.failure, self.cancelled)
 
     @model_validator(mode="after")
     def distinct(self) -> "Titles":
-        values = [v.strip().lower() for v in (self.candidate, self.pending, self.success, self.failure)]
-        if "" in values or len(set(values)) != 4:
-            raise ValueError("the four titles must be non-empty and different")
+        values = [v.strip().lower() for v in self.all()]
+        if "" in values or len(set(values)) != len(values):
+            raise ValueError("the stage titles must be non-empty and different")
         return self
 
 
@@ -70,6 +74,30 @@ class LoginCheckOut(BaseModel):
     day: date
     open: bool
     free_slots: int
+
+
+class AgendaEventOut(BaseModel):
+    event_id: str
+    title: str
+    start: datetime
+    end: datetime
+    location: str
+    stage: str  # candidate | pending | racing | booked | failed | cancelled | other
+    booking_id: int | None
+    opens_at: datetime | None  # when the booking site opens this slot
+    wakes_at: datetime | None  # when the bot wakes up for it (pending only)
+    court: str | None
+    actions: list[str]  # cancel | reset | retry
+
+
+class AgendaOut(BaseModel):
+    events: list[AgendaEventOut]
+    next_wake: AgendaEventOut | None
+    next_sync: datetime | None  # local mode only; in the cloud Cloud Scheduler runs it daily
+
+
+class ActionOut(BaseModel):
+    detail: str
 
 
 class CalendarCheckOut(BaseModel):

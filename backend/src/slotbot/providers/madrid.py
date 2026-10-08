@@ -177,6 +177,13 @@ class MadridSession:
             note += " (top it up before the next booking)"
         return BookingResult(Outcome.BOOKED, note, reference=cart_code, price=cart.total, balance=left)
 
+    async def cancel(self, reference: str) -> str:
+        """Cancel a paid booking; reference = the cart number kept from the booking."""
+        try:
+            return await self._web.cancel_rental(reference)
+        finally:
+            self._facility = self._loaded = None  # we left the tennis page
+
     async def _select(self, facility: str) -> None:
         if self._web.page is None or "ReservaEspacios" not in self._web.page.url:
             await self._web.open_tennis()  # back from the cart after a refused payment

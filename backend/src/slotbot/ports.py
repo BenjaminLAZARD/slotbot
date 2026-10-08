@@ -43,6 +43,10 @@ class ProviderSession(Protocol):
 
     async def book(self, slot: Slot) -> BookingResult: ...
 
+    async def cancel(self, reference: str) -> str:
+        """Cancel a booking made earlier (reference from BookingResult); returns what happened."""
+        ...
+
 
 class Provider(Protocol):
     """A booking system (Madrid municipal tennis, Paris Tennis, ...)."""

@@ -6,6 +6,23 @@ entry at the top at the end of each working session.
 
 ---
 
+## 2026-10-08 (afternoon) · v0.6: Upcoming list, cancel / reset, next wake
+
+- **Upcoming** (Bookings tab): next 10 calendar events with stage (candidate / pending / racing /
+  booked / failed / cancelled / not for the bot), booking opening, bot wake-up, court; "Bot wakes …"
+  line and next calendar check (local loop; "daily" in the cloud). `GET /api/profiles/{id}/agenda`.
+- **Cancel** (`POST …/events/{event_id}/cancel`): booked → cancelled on deportesweb (Account → rentals
+  menu 8844 → Consultar {cartCode} → RefundCart ×2, refund to the wallet; site message shown if
+  refused, e.g. < 24 h); pending/candidate → trigger cancelled. Event titled `titles.cancelled`
+  ("Cancelled - Tennis", new 5th title). **Not yet exercised on the real site** (only the demo).
+- **Reset** (`…/reset`): back to candidate (refused for a paid booking: cancel first), forgets
+  attempts, re-plans; "Make candidate" on any other event. `retitle` now keeps unmarked titles
+  ("Candidate Tennis · Tennis w/ Ana").
+- Fix: History showed "Pending - Tennis" after booking: the race now stores the final title.
+- 28 tests.
+
+---
+
 ## 2026-10-08 (noon) · v0.5: first real end-to-end booking, after four bugs
 
 **Result:** the bot booked La Elipa · Tenis 3, Mon 12 Oct 19:00–20:00, €6.90 from the wallet (cart

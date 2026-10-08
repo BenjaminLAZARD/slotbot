@@ -137,3 +137,56 @@ async def test_race_marks_cancelled_when_event_was_deleted(sessions, clock):
 
     async with sessions() as db:
         assert (await db.get(Booking, booking.id)).status == "cancelled"
+
+
+async def agenda_for(sessions, clock, calendar, triggers, sync):
+    from slotbot.services.agenda import AgendaService
+
+    vault = Vault(Fernet.generate_key().decode())
+    providers = ProviderRegistry([DemoProvider()])
+    return AgendaService(sessions, calendar, providers, vault, triggers, clock, sync, next_sync=lambda: None)
+
+
+async def test_agenda_lists_stages_wake_time_and_allowed_actions(sessions, clock):
+    events = [
+        event("e1", "Candidate Tennis", 13),
+        event("e2", "Candidate Tennis", 15),
+        event("e3", "Dentist", 14),
+    ]
+    calendar, triggers, sync, race, pid = await build(sessions, clock, events)
+    booking = await sync.sync_profile(pid)
+    agenda = await (await agenda_for(sessions, clock, calendar, triggers, sync)).agenda(pid)
+
+    stages = {i.event.id: (i.stage, i.actions) for i in agenda.items}
+    assert stages == {
+        "e1": ("pending", ("cancel", "reset")),
+        "e3": ("other", ("reset",)),
+        "e2": ("candidate", ("cancel",)),
+    }
+    assert agenda.next_wake.event.id == "e1" and agenda.next_wake.wakes_at == booking.trigger_at
+
+
+async def test_cancel_a_booked_event_cancels_on_the_site_then_reset_makes_it_a_candidate(sessions, clock):
+    from slotbot.services.agenda import ActionRefused
+
+    events = [event("e1", "Candidate Tennis", 13), event("e2", "Candidate Tennis", 15)]
+    calendar, triggers, sync, race, pid = await build(sessions, clock, events)
+    booking = await sync.sync_profile(pid)
+    clock.current = booking.trigger_at
+    await race.run(booking.id)  # demo books e1
+    service = await agenda_for(sessions, clock, calendar, triggers, sync)
+
+    try:
+        await service.reset(pid, "e1")
+        raise AssertionError("reset of a paid booking must be refused")
+    except ActionRefused:
+        pass
+
+    detail = await service.cancel(pid, "e1")
+    assert detail.startswith("demo:") and calendar.events["e1"].title == "Cancelled - Tennis"
+    async with sessions() as db:
+        assert (await db.get(Booking, booking.id)).status == "cancelled"
+
+    await service.reset(pid, "e1")
+    # e1 is a candidate again and, being the earliest, becomes the pending one once more
+    assert calendar.events["e1"].title == "Pending Tennis"
