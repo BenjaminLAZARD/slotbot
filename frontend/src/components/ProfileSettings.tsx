@@ -142,7 +142,7 @@ export function ProfileSettings({ profile, onSaved, onDeleted }: Props) {
             hint={
               meta.data?.email_enabled
                 ? 'Booked, failed, and when the wallet drops below the last price paid. Leave empty for no emails.'
-                : 'Email is off on this instance: set SLOTBOT_SMTP_USER and SLOTBOT_SMTP_PASSWORD in .env (see README).'
+                : 'Email is off on this instance: set SLOTBOT_RESEND_API_KEY in .env (see README).'
             }
           >
             <div className="flex gap-2">

@@ -106,14 +106,18 @@ After changing API models, regenerate the frontend's types: `cd frontend && npm 
 ### Email notifications
 
 The bot emails you when it books (court, time, price), when it fails (reason + attempts), and flags
-when the wallet balance left is below the price just paid. It sends through any SMTP account; the
-simplest is your own Gmail sending to yourself:
+when the wallet balance left is below the price just paid. It sends through [Resend](https://resend.com)
+(free: 100 emails/day):
 
-1. Google account → Security → turn on **2-Step Verification**.
-2. Create an **app password** at <https://myaccount.google.com/apppasswords> (name it "slotbot").
-3. In `.env`: `SLOTBOT_SMTP_USER=you@gmail.com` and `SLOTBOT_SMTP_PASSWORD=<the 16-letter app password>`,
-   then `docker compose up -d api`.
-4. In the UI → Settings: fill **Email me results**, save, press **Send test email**.
+1. Sign up at resend.com **with the address you want the emails at**. Without your own domain,
+   Resend only delivers to that address (from `onboarding@resend.dev`), which is all a personal
+   setup needs.
+2. *API Keys* → create a key with **Sending access** (it can send email and nothing else).
+3. In `.env`: `SLOTBOT_RESEND_API_KEY=re_…`, then `docker compose up -d api`.
+4. In the UI → Settings: put that same address in **Email me results**, save, press **Send test email**.
+
+SMTP (`SLOTBOT_SMTP_USER` / `SLOTBOT_SMTP_PASSWORD`) also works, but with Gmail it needs an app
+password, which grants access to your whole mailbox; prefer Resend.
 
 ## Running it so it books for you
 

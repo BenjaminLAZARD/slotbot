@@ -24,7 +24,7 @@ entry at the top at the end of each working session.
 - API: `POST /check-calendar`, `POST /test-notification`; `calendar_ok_at` / `login_ok_at` on profiles
   (migration `9b1c957139b3`), reset when the calendar ID / credentials change; calendar 403/404 →
   clear message naming the service account to share with; `MetaOut.email_enabled`.
-- Notifier port + `SmtpNotifier`; `RaceService` emails the result (`describe.notification`), never
+- Notifier port + `ResendNotifier` (chosen after Google warned about app passwords: a Resend "Sending access" key can only send, an app password opens the mailbox) and `SmtpNotifier`; `RaceService` emails the result (`describe.notification`), never
   letting an email failure hide the booking result. `BookingResult`/`RaceReport` carry price and
   balance; `RaceReport.balance_low`.
 - Dev: hot-reload polling every 5 s (Benjamin's request; the Mac was overloaded, mostly by Chrome).
@@ -33,7 +33,7 @@ entry at the top at the end of each working session.
 ### Open items
 1. Benjamin: share the calendar with `slotbot@divine-camera-228017.iam.gserviceaccount.com` ("Make
    changes to events") → Test calendar. Bike speed is set to 5 km/h (likely a typo for 15).
-2. Benjamin: Gmail app password in `.env` → Send test email. Re-run Test login (column is new).
+2. Benjamin: Resend account + Sending-access key in `.env` → Send test email. Re-run Test login (column is new).
 3. Opening-hour probe for 15 Oct still running.
 4. First real bot run; then GCP deploy.
 

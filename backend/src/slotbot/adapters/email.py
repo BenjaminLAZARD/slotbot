@@ -1,8 +1,37 @@
-"""Plain-text email over SMTP (e.g. your own Gmail with an app password, sending to yourself)."""
+"""Email notifiers: Resend's HTTP API (preferred) or plain SMTP (e.g. a Gmail app password)."""
 
 import asyncio
 import smtplib
 from email.message import EmailMessage
+
+import httpx
+
+
+class ResendNotifier:
+    """Resend (resend.com). Use a "Sending access" API key: it can send email and nothing else.
+
+    Without a verified domain, the sender must be onboarding@resend.dev and Resend only delivers
+    to the email address of the Resend account itself (other recipients get HTTP 403).
+    """
+
+    _URL = "https://api.resend.com/emails"
+
+    def __init__(self, http: httpx.AsyncClient, api_key: str, sender: str):
+        self._http = http
+        self._headers = {"Authorization": f"Bearer {api_key}"}
+        self._sender = sender
+
+    async def send(self, to: str, subject: str, body: str) -> None:
+        r = await self._http.post(
+            self._URL,
+            json={"from": self._sender, "to": [to], "subject": subject, "text": body},
+            headers=self._headers,
+        )
+        if r.status_code == 403 and "resend.dev" in self._sender:
+            raise RuntimeError(
+                f"Resend refused {to}: without your own domain it only emails your Resend account address"
+            )
+        r.raise_for_status()
 
 
 class SmtpNotifier:

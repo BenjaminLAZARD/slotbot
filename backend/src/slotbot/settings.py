@@ -18,8 +18,12 @@ class Settings(BaseSettings):
     # Shown to Nominatim (OpenStreetMap geocoder), whose usage policy asks for a contact.
     contact_email: str = ""
 
-    # Email notifications via SMTP; empty user = notifications off. With Gmail: an "app password"
-    # (Google account > Security > 2-Step Verification > App passwords), never your real password.
+    # Email notifications. Preferred: Resend with a "Sending access" API key (can only send).
+    # Without your own domain Resend only delivers to your Resend account's address.
+    resend_api_key: str = ""
+    email_from: str = "slotbot <onboarding@resend.dev>"
+    # Alternative: SMTP (empty user = off). With Gmail this needs an app password, which also grants
+    # access to your mailbox: prefer Resend.
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587
     smtp_user: str = ""

@@ -95,7 +95,7 @@ async def check_calendar(profile_id: int, db: DB, c: C) -> CalendarCheckOut:
 async def test_notification(profile_id: int, db: DB, c: C) -> None:
     cfg = ProfileConfig.model_validate((await _load(db, profile_id)).config)
     if c.notifier is None:
-        raise HTTPException(422, "email is off: set SLOTBOT_SMTP_USER and SLOTBOT_SMTP_PASSWORD in .env")
+        raise HTTPException(422, "email is off: set SLOTBOT_RESEND_API_KEY in .env (see README)")
     if not cfg.notify_email:
         raise HTTPException(422, "set a notification email in the profile first")
     try:

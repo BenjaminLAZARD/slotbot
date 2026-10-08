@@ -7,7 +7,7 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 
 from slotbot.adapters.clock import SystemClock
-from slotbot.adapters.email import SmtpNotifier
+from slotbot.adapters.email import ResendNotifier, SmtpNotifier
 from slotbot.adapters.geocoder import Nominatim
 from slotbot.adapters.google_auth import GoogleToken
 from slotbot.adapters.google_calendar import GoogleCalendar
@@ -70,7 +70,9 @@ def build_container(settings: Settings, http: httpx.AsyncClient) -> Container:
         triggers = LocalTriggers(clock)
 
     notifier: Notifier | None = None
-    if settings.smtp_user:
+    if settings.resend_api_key:
+        notifier = ResendNotifier(http, settings.resend_api_key, settings.email_from)
+    elif settings.smtp_user:
         notifier = SmtpNotifier(
             settings.smtp_host, settings.smtp_port, settings.smtp_user, settings.smtp_password
         )
