@@ -94,7 +94,7 @@ Both services hot-reload inside the containers (polling-based, so edits on the h
 
 | What | How |
 |---|---|
-| Backend code | edit `backend/src/**` → uvicorn restarts the worker (~1 s) |
+| Backend code | edit `backend/src/**` → uvicorn restarts the worker (within ~5 s) |
 | Frontend code | edit `frontend/src/**` → Vite hot-module replacement, no page reload |
 | Python breakpoints | debugpy listens on `localhost:5678`; in VS Code/Cursor run **Attach to API (docker)** (`.vscode/launch.json`) |
 | Run the API outside Docker | `docker compose up db`, then **API (local, no docker)** launch config, or `cd backend && uv run uvicorn slotbot.main:create_app --factory --reload` |

@@ -5,7 +5,7 @@ name: slotbot
 #   UI  -> http://localhost:5173
 #   API -> http://localhost:8000/docs
 #   Debugger -> attach to localhost:5678 (VS Code/Cursor: "Attach to API (docker)")
-# Both services hot-reload: edit backend/src or frontend/src and changes apply in ~1 s.
+# Both services hot-reload: edit backend/src or frontend/src and changes apply within ~5 s (polling, to keep CPU low).
 services:
   db:
     image: postgres:17-alpine
@@ -31,7 +31,7 @@ services:
       SLOTBOT_DATABASE_URL: postgresql+asyncpg://slotbot:slotbot@db:5432/slotbot
       SLOTBOT_GOOGLE_SERVICE_ACCOUNT: /secrets/google-service-account.json
       WATCHFILES_FORCE_POLLING: "true"  # bind-mounted files don't always emit change events
-      WATCHFILES_POLL_DELAY_MS: "1000"  # default 300 ms costs noticeable CPU
+      WATCHFILES_POLL_DELAY_MS: "5000"  # default 300 ms costs noticeable CPU
     volumes:
       - ./backend/src:/app/src
       - ./backend/migrations:/app/migrations
