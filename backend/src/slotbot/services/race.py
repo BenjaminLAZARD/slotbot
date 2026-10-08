@@ -71,7 +71,7 @@ async def run_race(plan: Plan, session: ProviderSession, clock: Clock, timing: T
             continue
         result = await journal.book(session, slot)
         if result.outcome is Outcome.BOOKED:
-            return journal.report("", slot, result.reference)
+            return journal.report("", slot, result.reference, note=result.detail)
         if result.outcome is Outcome.TAKEN:
             refused.add((slot.venue.id, slot.court, slot.start))
         else:
@@ -136,8 +136,10 @@ class _Journal:
         )
         return result
 
-    def report(self, reason: str, booked: Slot | None = None, reference: str = "") -> RaceReport:
-        return RaceReport(booked, reference, tuple(self.attempts), reason)
+    def report(
+        self, reason: str, booked: Slot | None = None, reference: str = "", note: str = ""
+    ) -> RaceReport:
+        return RaceReport(booked, reference, tuple(self.attempts), reason, note)
 
 
 class RaceService:
@@ -216,6 +218,7 @@ class RaceService:
                 "start": slot.start.isoformat(),
                 "end": slot.end.isoformat(),
                 "reference": report.reference,
+                "note": report.note,
             }
             if slot
             else {"reason": report.reason}

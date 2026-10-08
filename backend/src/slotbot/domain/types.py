@@ -110,3 +110,4 @@ class RaceReport:
     reference: str
     attempts: tuple[Attempt, ...]
     reason: str = ""
+    note: str = ""  # e.g. what was paid and the remaining balance

@@ -10,7 +10,8 @@ Flow for one tennis day:
     login page -> SelectMenu "Correo y contraseña" -> Login            (session cookie)
     Home -> SelectSubmenu "Deportes de raqueta" -> SelectMenu "Pista de tenis" -> redirect
     ReservaEspacios?token=... -> SelectFacility -> Seleccionar (usage) -> Continuar (date) -> grid
-    grid: pick cells into hdnCuadrante -> Reservar
+    grid: pick cells into hdnCuadrante -> Reservar -> CarritoConfirmar (cart)
+    cart: ConfirmCart with the wallet (payment type 5) -> CarritoResultado ("Confirmado")
 """
 
 import html
@@ -51,6 +52,9 @@ GRID_FIELD = "ctl00$ContentFixedSection$uReservaEspacios$uReservaCuadrante$hdnCu
 MENU_RACKET_SPORTS = {"menu_code": "8597", "menu_title": "Deportes de raqueta"}
 TENNIS_MENU_CODE = "8598"
 TENNIS_ACTIVITY = {"activity_code": "605", "activity_name": "TENIS"}
+# Payment methods on the cart page: card 10/25, Bizum 23/30, wallet ("monedero") 5/5.
+WALLET = {"payment_method_type": "5", "payment_method_code": "5"}
+_TEXT = re.compile(r"\.append\('((?:[^'\\]|\\.)*)'\)")
 
 
 class SiteError(Exception):
@@ -83,6 +87,35 @@ class GridCell:
     court_name: str
     start: str  # "HH:MM"
     asks_light: bool  # the site asks "¿Desea que la reserva lleve iluminación?"
+
+
+@dataclass(frozen=True)
+class Cart:
+    """What the cart page shows. Its content is rendered by scripts as `.append('text')` literals."""
+
+    items: int
+    total: float | None
+    wallet: float | None  # available wallet balance, None if the wallet is not offered
+    texts: tuple[str, ...]
+
+
+def page_texts(page_html: str) -> list[str]:
+    """Visible strings of pages that render themselves with jQuery `.append('...')` calls."""
+    return [html.unescape(t.replace("\\'", "'")) for t in _TEXT.findall(page_html)]
+
+
+def euros(text: str | None) -> float | None:
+    m = re.match(r"^\s*(\d+(?:[.,]\d+)?)\s*€", text or "")
+    return float(m.group(1).replace(",", ".")) if m else None
+
+
+def parse_cart(page_html: str) -> Cart:
+    texts = page_texts(page_html)
+
+    def after(label: str) -> str | None:
+        return next((texts[i + 1] for i, t in enumerate(texts[:-1]) if t == label), None)
+
+    return Cart(texts.count("Inicio"), euros(after("Total")), euros(after("Saldo disponible")), tuple(texts))
 
 
 def parse_delta(text: str) -> Delta:
@@ -219,7 +252,7 @@ class DeportesWeb:
 
     async def follow(self, delta: Delta) -> Page:
         if not delta.redirect:
-            raise SiteError(_alert(delta) or "expected a redirect")
+            raise SiteError(alert_text(delta) or "expected a redirect")
         return await self.open(urljoin(self.page.url if self.page else BASE, delta.redirect))
 
     # -- flows --------------------------------------------------------------------------------
@@ -326,7 +359,7 @@ class DeportesWeb:
         return grid_cells(panel)
 
     async def reserve(self, cell: GridCell, light: bool) -> Delta:
-        """Select one cell and press "Reservar". Next step (payment) not captured yet."""
+        """Select one cell and press "Reservar"; on success the site redirects to the cart."""
         flag = ("true" if light else "false") if cell.asks_light else "?"
         return await self.postback(
             "uAlert_uplAlert",
@@ -336,6 +369,13 @@ class DeportesWeb:
                 "args": {"personCode": self.person_code},
             },
             extra={GRID_FIELD: f"+{cell.court_code}#{cell.start}#{flag};"},
+        )
+
+    async def confirm_cart(self, payment: dict[str, str]) -> Delta:
+        """Press "Confirmar la compra" on the cart page; on success the site redirects to the result."""
+        return await self.postback(
+            "ContentFixedSection_uCarritoConfirmar_uAlert_uplAlert",
+            {"action": "ConfirmCart", "args": payment},
         )
 
 
@@ -350,6 +390,6 @@ def _menu_payload(text: str, menu_code: str) -> dict[str, Any]:
     return payload
 
 
-def _alert(delta: Delta) -> str:
+def alert_text(delta: Delta) -> str:
     alert = next((v for k, v in delta.panels.items() if k.endswith("uAlert_uplAlert")), "")
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html.unescape(alert))).strip(" x")

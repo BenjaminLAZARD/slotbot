@@ -20,9 +20,16 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
-from slotbot.domain.types import BookingResult, GeoPoint, Slot, Venue
+from slotbot.domain.types import BookingResult, GeoPoint, Outcome, Slot, Venue
 from slotbot.ports import Geocoder
-from slotbot.providers.deportesweb import DeportesWeb, GridCell
+from slotbot.providers.deportesweb import (
+    WALLET,
+    DeportesWeb,
+    GridCell,
+    alert_text,
+    page_texts,
+    parse_cart,
+)
 
 OPEN_DATA = "https://datos.madrid.es/egob/catalogo/200186-0-polideportivos.json"
 SLOT_LENGTH = timedelta(minutes=60)  # usage "Tenis 60 minutos"
@@ -129,11 +136,42 @@ class MadridSession:
         day = slot.start.date()
         if self._loaded != (slot.venue.id, day):  # the site books from the grid currently shown
             await self.free_slots(day, slot.venue)
-        # The step after "Reservar" (payment from the wallet, confirmation) has not been captured
-        # yet. Refuse rather than leave a half-made reservation behind.
-        raise NotImplementedError("Madrid payment step not captured yet (docs/madrid-api.md)")
+        if (cell := self._cells.get(slot.ref)) is None:
+            return BookingResult(Outcome.TAKEN, "no longer offered")
+
+        reserved = await self._web.reserve(cell, self._light)
+        self._facility = self._loaded = None  # the next step leaves the tennis page
+        if not reserved.redirect:
+            return BookingResult(Outcome.TAKEN, alert_text(reserved) or "refused by the site")
+        await self._web.follow(reserved)
+
+        cart = parse_cart(self._web.html)
+        if cart.items != 1 or cell.start not in cart.texts:
+            return BookingResult(Outcome.ERROR, f"unexpected cart ({cart.items} items): not paying")
+        if cart.wallet is None or cart.total is None or cart.wallet < cart.total:
+            return BookingResult(
+                Outcome.ERROR,
+                f"wallet {cart.wallet} € < price {cart.total} €: slot left in your deportesweb cart",
+            )
+
+        paid = await self._web.confirm_cart(WALLET)
+        if not paid.redirect:
+            return BookingResult(Outcome.ERROR, f"payment refused: {alert_text(paid) or 'no confirmation'}")
+        await self._web.follow(paid)
+        texts = page_texts(self._web.html)
+        if "Confirmado" not in texts:
+            return BookingResult(Outcome.ERROR, "payment not confirmed; check deportesweb")
+        # The cart number is what cancelling needs (Consultar {cartCode} -> RefundCart).
+        cart_code = next((texts[i + 1] for i, t in enumerate(texts[:-1]) if t == "Carrito"), "")
+        left = cart.wallet - cart.total
+        note = f"paid {cart.total:.2f} € from the wallet, {left:.2f} € left"
+        if left < cart.total:
+            note += " (top it up before the next booking)"
+        return BookingResult(Outcome.BOOKED, note, reference=cart_code)
 
     async def _select(self, facility: str) -> None:
+        if self._web.page is None or "ReservaEspacios" not in self._web.page.url:
+            await self._web.open_tennis()  # back from the cart after a refused payment
         self._usage = await self._web.select_facility(facility)
         self._facility, self._loaded = facility, None
 

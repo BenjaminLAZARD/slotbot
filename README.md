@@ -9,11 +9,11 @@ First supported booking system: **Madrid municipal sports centres** (the system 
 *Madrid Móvil* app and [deportesweb.madrid.es](https://deportesweb.madrid.es)). Built so that other
 cities or booking sites plug in as one module.
 
-> **Status (2026-10-07):** calendar planning, venue ranking (the booking site's own 33 tennis
-> centres), login, opening detection and availability work against the live Madrid site. The last
-> step, paying from the wallet after "Reservar", still has to be captured: until then the bot stops
-> short of booking. See [docs/madrid-api.md](docs/madrid-api.md).
-> The change log and open items live in [HISTORY.md](HISTORY.md).
+> **Status (2026-10-08):** the whole Madrid chain is implemented: planning, venues (the booking
+> site's own 33 tennis centres), login, opening detection, availability, reservation and payment
+> **from the Madrid wallet** (top it up yourself; card/Bizum/Google Pay need your bank's approval and
+> can't be automated). The flow was captured from a real booking; the bot's own first end-to-end run
+> is still to come. See [docs/madrid-api.md](docs/madrid-api.md) and [HISTORY.md](HISTORY.md).
 
 ## How it works
 

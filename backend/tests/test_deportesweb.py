@@ -2,8 +2,35 @@
 
 import json
 
-from slotbot.providers.deportesweb import _menu_payload, form_fields, grid_cells, json_after, parse_delta
+from slotbot.providers.deportesweb import (
+    _menu_payload,
+    form_fields,
+    grid_cells,
+    json_after,
+    page_texts,
+    parse_cart,
+    parse_delta,
+)
 from slotbot.providers.madrid import _key, _plain_address
+
+
+def test_cart_page_reads_items_total_and_wallet_balance():
+    # Shaped like CarritoConfirmar on 2026-10-08: the page renders itself with jQuery .append('...').
+    page = (
+        "$t.append('Tenis 2 La Chopera'); $a.append('Inicio'); $b.append('16:30'); $c.append('Fin');"
+        "$d.append('17:30'); $e.append('Total'); $f.append('6,90 €'); $g.append('Monedero');"
+        "$h.append('Saldo disponible'); $i.append('10,00 €'); $j.append('Confirmar la compra')"
+    )
+    cart = parse_cart(page)
+    assert (cart.items, cart.total, cart.wallet) == (1, 6.9, 10.0)
+    assert "16:30" in cart.texts
+    assert parse_cart("$a.append('Total'); $b.append('6,90 €')").wallet is None  # wallet not offered
+
+
+def test_result_page_texts_carry_confirmation_and_operation():
+    page = "$x.append('Confirmado'); $y.append('Pago 6,90 €'); $z.append('Operación 8075908894')"
+    texts = page_texts(page)
+    assert "Confirmado" in texts and "Operación 8075908894" in texts
 
 
 def delta(*parts: tuple[str, str, str]) -> str:

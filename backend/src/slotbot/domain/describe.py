@@ -73,6 +73,7 @@ def result_lines(plan: Plan, report: RaceReport) -> list[str]:
     skipped = len(report.attempts) - len(attempts)
     return [
         head,
+        *([f"Payment: {report.note}"] if report.note else []),
         *plan_lines(plan, status),
         f"Attempts ({len(report.attempts)}):" + (f" last {len(attempts)} shown" if skipped else ""),
         *(attempts or ["  none"]),

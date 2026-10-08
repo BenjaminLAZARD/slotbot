@@ -48,7 +48,10 @@ Responses use ASP.NET AJAX's delta format `length|type|id|content|…`: `updateP
 | Open a centre | `ContentFixedSection_uReservaEspacios_uCentrosSeleccionar_uAlert_uplAlert` | `SelectFacility` `{menu_code:"8598", facility_code, activity:{activity_code:"605"}, date:null}` → usage `{reservation_type_code:"124", "dates":[bookable days]}` |
 | Choose usage | `uAlert_uplAlert` | `{controlID:"…_uUsosSeleccionar", action:"Seleccionar", args:<usage>}` |
 | Choose day / poll | `uAlert_uplAlert` | `{controlID:"…_uFechaSeleccionar", action:"Continuar", args:"YYYY-MM-DD"}` → grid |
-| Book | `uAlert_uplAlert` | `{controlID:"…_uReservaCuadrante", action:"Reservar", args:{personCode}}` + field `…$hdnCuadrante = "+<court>#<HH:MM>#<true|false|?>;"` |
+| Book | `uAlert_uplAlert` | `{controlID:"…_uReservaCuadrante", action:"Reservar", args:{personCode}}` + field `…$hdnCuadrante = "+<court>#<HH:MM>#<true|false|?>;"` → redirect `Modulos/VentaServicios/CarritoConfirmar` |
+| Pay | `ContentFixedSection_uCarritoConfirmar_uAlert_uplAlert` | `ConfirmCart` `{payment_method_type:"5", payment_method_code:"5"}` (wallet; card is 10/25, Bizum 23/30) → redirect `CarritoResultado` ("Confirmado", `Carrito <n>`, `Operación <n>`) |
+| Rentals list | `/Account` → "Alquileres de unidades deportivas" | `Modulos/Alquileres/Alquileres?token=…` |
+| Cancel | `uAlert_uplAlert` then `ContentSection_uAlquileres_uCarritosFicha_uAlert_uplAlert` | `{controlID:"ContentSection_uAlquileres", action:"Consultar", args:{cartCode}}`, then `RefundCart {ignorarAdvertencia:false}` (warning) and `RefundCart {ignorarAdvertencia:true}` → "Anulado", refund to the wallet |
 
 Grid cells: free ones carry `celdaCuadrante('<cellId>','<courtCode>','<HH:MM>', …)` (quotes arrive as
 `&#39;`) and `blnPreguntarLuz` (asks about floodlights). **A day that is not open yet still renders a
@@ -57,10 +60,22 @@ grid** (all cells free, since nobody could book): the reliable "is it open?" sig
 
 `personCode` is in the page as escaped JSON (`\"person_code\":\"…\"`).
 
-## Still to capture
+The cart and result pages render themselves with jQuery `.append('text')` literals; the bot reads
+those strings (items, `Total`, `Saldo disponible` = wallet balance, `Confirmado`, `Carrito <n>`).
 
-**What happens after `Reservar`**: the redirect target, the payment page (choose the wallet), the
-confirmation, and what "already taken" looks like. Until then `MadridSession.book` refuses to press
-`Reservar`, so the bot never leaves a half-made reservation. Capture plan: you make one real booking
-in the Claude browser pane (paying from the wallet) while the requests are recorded; you can cancel
-it free of charge within 10 minutes.
+## Payment
+
+Card, Bizum and Google Pay always end in the bank's strong-customer-authentication step (approve in
+the banking app), which a bot cannot do. The bot therefore pays **only from the wallet**, which the
+user tops up themselves ("Recarga monedero" on Home, any method). Before paying it checks that the
+cart holds exactly the slot it reserved and that the balance covers the total; otherwise it stops and
+leaves the slot in the cart for the user.
+
+Captured with a real booking on 2026-10-08 (La Chopera, Tenis 2, 12 Oct 16:30, €6.90 from the
+wallet), then cancelled and refunded the same minute.
+
+## Not observed yet
+
+What `Reservar` returns when the slot was just taken, and what `ConfirmCart` returns when the wallet
+is short: both are handled generically (no redirect → read the alert text → try the next candidate /
+report the error).

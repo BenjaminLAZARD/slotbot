@@ -6,6 +6,52 @@ entry at the top at the end of each working session.
 
 ---
 
+## 2026-10-08 · v0.3: payment from the Madrid wallet
+
+### Decisions
+- **Payment = Madrid wallet (monedero) only** (Benjamin, after discussion). Card, Bizum and Google Pay
+  always hit the bank's strong customer authentication (PSD2): approval in the banking app, which a
+  bot can't do. Benjamin tried Google Pay → BoursoBank 3-D Secure prompt. He tops up the wallet himself
+  (Google Pay is fine there); the bot pays bookings from the balance.
+- Researched how others solve agent payments (prepaid balances, own virtual cards via issuing
+  platforms + merchant-of-record, Visa/Mastercard agent tokens and Google AP2 mandates, human in the
+  loop). Only the wallet works today on a non-cooperating municipal site. AP2 / agent tokens are the
+  thing to watch for the hosted product.
+- Floodlights: keep "yes when asked" (none of the slots seen so far ask). Multi-sport courts
+  ("Pista polideportiva") are acceptable.
+
+### Captured (real booking, then cancelled; docs/madrid-api.md)
+- `Reservar` → `CarritoConfirmar` (cart) → `ConfirmCart {payment_method_type:"5", code:"5"}` →
+  `CarritoResultado` ("Confirmado", cart + operation numbers). Test: La Chopera Tenis 2, Mon 12 Oct
+  16:30, €6.90, wallet €10 → €3.10.
+- Cancel: Account → rentals list → `Consultar {cartCode}` → `RefundCart` ×2 → "Anulado", refunded.
+- Booking at 4 days ahead per Benjamin, so cancellation was free.
+
+### Changes
+- `deportesweb.py`: `confirm_cart`, `parse_cart` / `page_texts` (pages render via `.append('…')`),
+  wallet constant.
+- `MadridSession.book`: Reservar → verify the cart holds exactly our slot → verify wallet ≥ total →
+  pay from wallet → require "Confirmado"; reference = cart number (needed to cancel); note = amount
+  paid + balance left (+ top-up warning), written into the calendar event ("Payment: …").
+- UI: setup checklist card ("Finish setup": account stored, login tested), full-width tabs, account
+  form first in Settings. Opening probe survives network drops; run under `caffeinate`.
+- 21 tests.
+
+### Opening hour (still open)
+- 7 Oct 21:00: bookable up to 13 Oct. 8 Oct 09:05: up to 14 Oct. So D−6 opens between 21:38 and
+  09:05 (probe #1 died at 21:38 when the Mac lost network). Probe #2 is watching for 15 Oct.
+
+### Open items
+1. Read probe #2 → set `SLOTBOT_MADRID_OPENS_AT`.
+2. Benjamin: store Madrid credentials in the UI → "Test login".
+3. First real bot run: a Candidate Tennis event ≥ 4 days ahead (free cancellation) whose window is
+   already open → sync → race → check calendar + booking, then cancel.
+4. Bot-side cancellation (Consultar + RefundCart) when an event is deleted > 24 h before.
+5. Unobserved responses: "slot just taken" at Reservar, "wallet short" at ConfirmCart.
+6. Earlier items: GCP deploy, product track.
+
+---
+
 ## 2026-10-07 (evening) · v0.2: Madrid site reverse-engineered
 
 ### Context
