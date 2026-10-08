@@ -52,30 +52,27 @@ async def session() -> DeportesWeb:
 
 
 async def main(target: date) -> None:
-    s = await session()
+    s: DeportesWeb | None = None
     last: list[str] = []
     while True:
         now = datetime.now(MADRID)
         try:
+            s = s or await session()
             dates = await bookable_dates(s)
-        except Exception as e:  # session expired or hiccup: start a fresh one
-            print(f"{now:%H:%M:%S} error {type(e).__name__}: {e}; new session", flush=True)
-            await asyncio.sleep(5)
-            s = await session()
+        except Exception as e:  # network drop, laptop sleep, expired session: start over
+            print(f"{now:%H:%M:%S} error {type(e).__name__}: {e}; retrying", flush=True)
+            s = None
+            await asyncio.sleep(15)
             continue
         if dates != last:
-            print(
-                f"{now:%Y-%m-%d %H:%M:%S} bookable: {dates[0]} .. {dates[-1]} ({len(dates)} days)", flush=True
-            )
+            span = f"{dates[0]} .. {dates[-1]} ({len(dates)} days)"
+            print(f"{now:%Y-%m-%d %H:%M:%S} bookable: {span}", flush=True)
             last = dates
         if target.isoformat() in dates:
             print(f"OPENED: {target} became bookable by {now:%Y-%m-%d %H:%M:%S %Z}", flush=True)
             return
-        near = any(
-            abs((now.hour * 60 + now.minute) - h * 60) <= 4
-            or (h == 0 and now.hour == 23 and now.minute >= 56)
-            for h in (0, 7, 8, 9)
-        )
+        minute = now.hour * 60 + now.minute
+        near = any(min(abs(minute - h * 60), 1440 - abs(minute - h * 60)) <= 4 for h in (0, 7, 8, 9))
         await asyncio.sleep(5 if near else 60)
 
 
