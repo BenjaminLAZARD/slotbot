@@ -36,8 +36,19 @@ class FakeNotifier:
         self.sent.append((to, subject, body))
 
 
-async def build(sessions, clock, events, notifier: FakeNotifier | None = None):
-    calendar, triggers = FakeCalendar(events), FakeTriggers()
+class ImmediateTriggers(FakeTriggers):
+    """Fires the race inside schedule(), like a trigger that is already due (local timers, Cloud Tasks)."""
+
+    fire = None
+
+    async def schedule(self, booking_id: int, at: datetime) -> str:
+        ref = await super().schedule(booking_id, at)
+        await self.fire(booking_id)
+        return ref
+
+
+async def build(sessions, clock, events, notifier: FakeNotifier | None = None, triggers=None):
+    calendar, triggers = FakeCalendar(events), triggers or FakeTriggers()
     providers = ProviderRegistry([DemoProvider()])
     planner = Planner(FakeGeocoder(), VenueCatalogue(sessions, clock))
     sync = SyncService(sessions, calendar, planner, providers, triggers, clock, TIMING.lead)
@@ -100,6 +111,21 @@ async def test_race_books_writes_back_and_promotes_next_event(sessions, clock):
 
     await race.run(booking.id)  # a duplicate trigger is a no-op
     assert calendar.events["e1"].title == "Success - Tennis"
+
+
+async def test_a_trigger_due_now_sees_the_saved_booking(sessions, clock):
+    # 2 days ahead: the booking window is already open, so the trigger fires as soon as it's scheduled.
+    triggers = ImmediateTriggers()
+    calendar, _, sync, race, pid = await build(
+        sessions, clock, [event("e1", "Candidate Tennis", 7)], triggers=triggers
+    )
+    triggers.fire = race.run
+
+    await sync.sync_profile(pid)
+
+    assert (
+        calendar.events["e1"].title == "Success - Tennis"
+    )  # the race ran instead of "not pending; skipping"
 
 
 async def test_race_marks_cancelled_when_event_was_deleted(sessions, clock):

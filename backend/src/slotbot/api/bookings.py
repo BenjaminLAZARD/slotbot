@@ -20,7 +20,8 @@ async def retry(booking_id: int, db: DB, c: C) -> BookingOut:
         raise HTTPException(409, f"window not open yet; the race is scheduled for {booking.trigger_at}")
     if booking.trigger_ref:
         await c.triggers.cancel(booking.trigger_ref)
-    booking.status = BookingStatus.PENDING
+    booking.status, booking.trigger_ref = BookingStatus.PENDING, None
+    await db.commit()  # first: the race fires right away and must see "pending"
     booking.trigger_ref = await c.triggers.schedule(booking.id, now)
     await db.commit()
     return BookingOut.model_validate(booking)

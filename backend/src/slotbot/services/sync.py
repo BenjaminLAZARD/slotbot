@@ -71,14 +71,20 @@ class SyncService:
                 return None
             plan = await self._planner.plan(target, cfg, provider, refresh_venues)
             title = retitle(target.title, cfg.titles.pending, cfg.titles.candidate, cfg.titles.pending)
-            booking = await self._arm(db, profile_id, plan, title)
+            booking, rearm = await self._arm(db, profile_id, plan, title)
             await db.commit()
 
-        description = compose(target.description, plan_lines(plan, "pending"))
-        if (title, description) != (target.title, target.description):
-            await self._calendar.update(
-                cfg.calendar_id, target.id, EventChanges(title=title, description=description)
-            )
+            description = compose(target.description, plan_lines(plan, "pending"))
+            if (title, description) != (target.title, target.description):
+                await self._calendar.update(
+                    cfg.calendar_id, target.id, EventChanges(title=title, description=description)
+                )
+            # Last: a trigger that is already due may run the race right away, and the race must
+            # find the booking saved and write its result over "Pending", not the other way round.
+            if rearm:
+                at = max(booking.trigger_at, self._clock.now())
+                booking.trigger_ref = await self._triggers.schedule(booking.id, at)
+                await db.commit()
         return booking
 
     async def _next_target(
@@ -101,8 +107,8 @@ class SyncService:
         )
         return next((e for e in marked if e.id not in done), None)
 
-    async def _arm(self, db: AsyncSession, profile_id: int, plan: Plan, title: str) -> Booking:
-        """Upsert the booking row and (re)schedule its trigger if the opening time moved."""
+    async def _arm(self, db: AsyncSession, profile_id: int, plan: Plan, title: str) -> tuple[Booking, bool]:
+        """Upsert the booking row; True when its trigger must be (re)scheduled (after commit)."""
         desired = plan.opens_at - self._lead
         booking = await db.scalar(
             select(Booking).where(Booking.profile_id == profile_id, Booking.event_id == plan.event.id)
@@ -114,14 +120,13 @@ class SyncService:
         booking.play_start = plan.event.start
         booking.opens_at = plan.opens_at
         if booking.trigger_ref and booking.trigger_at == desired:
-            return booking
+            return booking, False
         if booking.trigger_ref:
             await self._triggers.cancel(booking.trigger_ref)
         booking.trigger_at = desired
+        booking.trigger_ref = None
         booking.status = BookingStatus.PENDING
-        await db.flush()  # assigns booking.id for new rows
-        booking.trigger_ref = await self._triggers.schedule(booking.id, max(desired, self._clock.now()))
-        return booking
+        return booking, True
 
     async def _expire_stale_races(self, db: AsyncSession, profile_id: int) -> None:
         await db.execute(
