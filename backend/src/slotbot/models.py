@@ -43,6 +43,9 @@ class Profile(Base):
     config: Mapped[dict[str, Any]]  # validated by schemas.ProfileConfig
     credentials: Mapped[str | None] = mapped_column(Text)  # Fernet-encrypted JSON
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    # Last successful setup checks; reset when the calendar ID or the credentials change.
+    calendar_ok_at: Mapped[datetime | None]
+    login_ok_at: Mapped[datetime | None]
 
 
 class BookingStatus(StrEnum):

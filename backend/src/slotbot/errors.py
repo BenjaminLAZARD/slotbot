@@ -1,2 +1,2 @@
 class ConfigError(Exception):
-    """The instance is missing configuration (e.g. no Google service-account key)."""
+    """Setup is incomplete (no Google key, calendar not shared, ...). Shown to the user as is."""

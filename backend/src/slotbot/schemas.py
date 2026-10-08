@@ -49,6 +49,8 @@ class ProfileIn(BaseModel):
 class ProfileOut(ProfileIn):
     id: int
     has_credentials: bool
+    calendar_ok: bool  # last "Test calendar" succeeded (reset when the calendar ID changes)
+    login_ok: bool  # last "Test login" succeeded (reset when credentials change)
 
 
 class CredentialsIn(BaseModel):
@@ -67,6 +69,11 @@ class LoginCheckOut(BaseModel):
     day: date
     open: bool
     free_slots: int
+
+
+class CalendarCheckOut(BaseModel):
+    events: int  # upcoming events the bot can see
+    candidates: int  # of which marked candidate/pending
 
 
 class BookingOut(BaseModel):

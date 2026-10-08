@@ -58,6 +58,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/profiles/{profile_id}/check-calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Calendar
+         * @description Read the calendar as the bot would; a clear error says what to share if Google refuses.
+         */
+        post: operations["check_calendar_api_profiles__profile_id__check_calendar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/profiles/{profile_id}/check-login": {
         parameters: {
             query?: never;
@@ -252,6 +272,13 @@ export interface components {
              */
             updated_at: string;
         };
+        /** CalendarCheckOut */
+        CalendarCheckOut: {
+            /** Events */
+            events: number;
+            /** Candidates */
+            candidates: number;
+        };
         /** CredentialsIn */
         CredentialsIn: {
             /** Values */
@@ -374,6 +401,10 @@ export interface components {
             id: number;
             /** Has Credentials */
             has_credentials: boolean;
+            /** Calendar Ok */
+            calendar_ok: boolean;
+            /** Login Ok */
+            login_ok: boolean;
         };
         /** ProviderOut */
         ProviderOut: {
@@ -612,6 +643,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_calendar_api_profiles__profile_id__check_calendar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarCheckOut"];
+                };
             };
             /** @description Validation Error */
             422: {

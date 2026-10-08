@@ -37,9 +37,15 @@ export function ProfileSettings({ profile, onSaved, onDeleted }: Props) {
   const set = <K extends keyof ProfileConfig>(key: K, value: ProfileConfig[K]) =>
     setCfg((c) => ({ ...c, [key]: value }))
   const provider = meta.data?.providers.find((p) => p.key === cfg.provider)
+  const dirty = profile !== null && JSON.stringify({ name, cfg }) !== JSON.stringify({ name: profile.name, cfg: profile.config })
 
   const submit = () =>
     save.mutate({ id: profile?.id, body: { name, config: cfg } }, { onSuccess: (p) => onSaved(p.id) })
+  const discard = () => {
+    if (!profile) return
+    setName(profile.name)
+    setCfg(profile.config)
+  }
 
   return (
     <div className="grid gap-6">
@@ -140,6 +146,19 @@ export function ProfileSettings({ profile, onSaved, onDeleted }: Props) {
       </Card>
 
       <ConstraintsHelp candidate={cfg.titles.candidate} />
+      {dirty && (
+        <div className="sticky bottom-4 z-10 flex items-center justify-between gap-3 rounded-lg border bg-background p-3 shadow-lg">
+          <span className="text-sm font-medium">Unsaved changes</span>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={discard}>
+              Discard
+            </Button>
+            <Button onClick={submit} disabled={save.isPending}>
+              {save.isPending ? 'Saving…' : 'Save'}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

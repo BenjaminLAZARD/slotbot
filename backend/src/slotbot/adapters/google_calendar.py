@@ -11,6 +11,7 @@ import httpx
 
 from slotbot.adapters.google_auth import GoogleToken
 from slotbot.domain.types import CalendarEvent
+from slotbot.errors import ConfigError
 from slotbot.ports import EventChanges
 
 _API = "https://www.googleapis.com/calendar/v3/calendars"
@@ -32,6 +33,11 @@ class GoogleCalendar:
         r = await self._http.get(
             f"{_API}/{quote(calendar_id)}/events", params=params, headers=await self._token.headers()
         )
+        if r.status_code in (403, 404):  # Google answers 404 when the calendar isn't shared with us
+            raise ConfigError(
+                f"Google can't see calendar '{calendar_id}'. Check the ID, and share the calendar with "
+                f"{self._token.email} ('Make changes to events')."
+            )
         r.raise_for_status()
         return [e for item in r.json().get("items", []) if (e := _event(item))]
 

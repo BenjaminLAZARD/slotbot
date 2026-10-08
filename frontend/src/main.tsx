@@ -14,8 +14,8 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <App />
-        <Toaster richColors />
-        {import.meta.env.DEV && <ReactQueryDevtools buttonPosition="bottom-left" />}
+        <Toaster richColors position="top-center" />
+        {import.meta.env.DEV && <ReactQueryDevtools buttonPosition="bottom-right" />}
       </TooltipProvider>
     </QueryClientProvider>
   </StrictMode>,

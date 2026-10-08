@@ -4,10 +4,12 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 
 from slotbot.api.deps import DB, C
+from slotbot.domain.describe import has_marker
 from slotbot.domain.ranking import nearby
 from slotbot.models import Booking, BookingStatus, Profile
 from slotbot.schemas import (
     BookingOut,
+    CalendarCheckOut,
     CredentialsIn,
     LoginCheckOut,
     ProfileConfig,
@@ -42,6 +44,8 @@ async def get_profile(profile_id: int, db: DB) -> ProfileOut:
 async def update_profile(profile_id: int, body: ProfileIn, db: DB, c: C) -> ProfileOut:
     _check_provider(c, body.config)
     profile = await _load(db, profile_id)
+    if body.config.calendar_id != profile.config.get("calendar_id"):
+        profile.calendar_ok_at = None
     profile.name, profile.config = body.name, body.config.model_dump()
     await db.commit()
     return _out(profile)
@@ -67,7 +71,24 @@ async def set_credentials(profile_id: int, body: CredentialsIn, db: DB, c: C) ->
     if missing := [f for f in provider.credential_fields if not body.values.get(f)]:
         raise HTTPException(422, f"missing: {', '.join(missing)}")
     profile.credentials = c.vault.seal({f: body.values[f] for f in provider.credential_fields})
+    profile.login_ok_at = None
     await db.commit()
+
+
+@router.post("/{profile_id}/check-calendar")
+async def check_calendar(profile_id: int, db: DB, c: C) -> CalendarCheckOut:
+    """Read the calendar as the bot would; a clear error says what to share if Google refuses."""
+    profile = await _load(db, profile_id)
+    cfg = ProfileConfig.model_validate(profile.config)
+    events = await c.calendar.upcoming(cfg.calendar_id, c.clock.now(), cfg.lookahead_days)
+    profile.calendar_ok_at = c.clock.now()
+    await db.commit()
+    marked = [
+        e
+        for e in events
+        if has_marker(e.title, cfg.titles.candidate) or has_marker(e.title, cfg.titles.pending)
+    ]
+    return CalendarCheckOut(events=len(events), candidates=len(marked))
 
 
 @router.post("/{profile_id}/check-login")
@@ -90,6 +111,8 @@ async def check_login(profile_id: int, db: DB, c: C) -> LoginCheckOut:
             free = await session.free_slots(day, venue) if is_open else []
     except Exception as e:
         raise HTTPException(502, f"{type(e).__name__}: {e}") from None
+    profile.login_ok_at = c.clock.now()
+    await db.commit()
     return LoginCheckOut(venue=venue.name, day=day, open=is_open, free_slots=len(free))
 
 
@@ -144,4 +167,6 @@ def _out(p: Profile) -> ProfileOut:
         name=p.name,
         config=ProfileConfig.model_validate(p.config),
         has_credentials=bool(p.credentials),
+        calendar_ok=p.calendar_ok_at is not None,
+        login_ok=p.login_ok_at is not None,
     )

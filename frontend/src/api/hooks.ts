@@ -125,13 +125,32 @@ export function useRetry(profileId: number) {
 }
 
 export function useCheckLogin(profileId: number) {
+  const qc = useQueryClient()
   return useMutation({
     mutationFn: () =>
       call(api.POST('/api/profiles/{profile_id}/check-login', { params: { path: { profile_id: profileId } } })),
-    onSuccess: (r) =>
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: keys.profiles })
       toast.success(
         `Logged in. ${r.venue}, ${r.day}: ${r.open ? `${r.free_slots} free slots` : 'not bookable yet'}`,
-      ),
+      )
+    },
     onError,
+  })
+}
+
+export function useCheckCalendar(profileId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () =>
+      call(api.POST('/api/profiles/{profile_id}/check-calendar', { params: { path: { profile_id: profileId } } })),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: keys.profiles })
+      toast.success(`Calendar reachable: ${r.events} upcoming event(s), ${r.candidates} marked for booking`)
+    },
+    onError: (e: Error) => {
+      qc.invalidateQueries({ queryKey: keys.profiles })
+      toast.error(e.message, { duration: 15_000 })
+    },
   })
 }
