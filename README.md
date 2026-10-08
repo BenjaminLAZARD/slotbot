@@ -132,8 +132,9 @@ runs, at the daily sync and at each trigger (5 min before a booking window opens
 ## Deploying (scale-to-zero on Google Cloud)
 
 Nothing runs 24/7: Cloud Run hosts the container and scales to zero, **Cloud Tasks** calls
-`/jobs/race/{id}` at the exact trigger time, **Cloud Scheduler** calls `/jobs/sync` daily, and the
-database is **Neon** Postgres (also scales to zero). Step-by-step: [deploy/gcp.md](deploy/gcp.md).
+`/jobs/race/{id}` at the exact trigger time, **Cloud Scheduler** calls `/jobs/sync` hourly, and the
+database is **Neon** Postgres (also scales to zero). A €10 budget alerts by email and, through
+Pub/Sub → `/jobs/budget`, detaches billing when reached. Step-by-step: [deploy/gcp.md](deploy/gcp.md).
 
 ## Project layout
 

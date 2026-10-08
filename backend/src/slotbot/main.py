@@ -45,8 +45,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def upstream_error(_: Request, e: httpx.HTTPError) -> JSONResponse:
         return JSONResponse({"detail": f"upstream service failed: {e}"}, status_code=502)
 
-    @app.get("/healthz", include_in_schema=False)
-    async def healthz() -> dict[str, str]:
+    @app.get("/health", include_in_schema=False)  # not /healthz: Cloud Run's front end reserves it
+    async def health() -> dict[str, str]:
         return {"status": "ok"}
 
     # In the production image the built React app is served by the API itself (one Cloud Run service).

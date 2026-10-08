@@ -1,0 +1,16 @@
+# Files never uploaded to Cloud Build (gcloud run deploy --source .)
+.git/
+.gitignore
+.env
+.env.*
+!.env.example
+secrets/
+**/node_modules/
+**/.venv/
+**/dist/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+.probe-*.log
+.vscode/
+.claude/

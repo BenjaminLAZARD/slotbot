@@ -6,6 +6,58 @@ entry at the top at the end of each working session.
 
 ---
 
+## 2026-10-08 (evening) · v0.7: running on Google Cloud
+
+### What is live (project `divine-camera-228017`, step by step in deploy/gcp.md)
+- **Cloud Run** `slotbot`, europe-southwest1 (Madrid), 0..1 instance, timeout 3600 s, private
+  (UI via `gcloud run services proxy … --port 8090`). Secrets in Secret Manager: database URL,
+  Fernet key (same as local, so stored credentials still decrypt), job token, Resend key.
+- **Cloud Tasks** queue `slotbot` in **europe-west1** (Tasks isn't offered in europe-southwest1),
+  max 1 attempt. **Cloud Scheduler** `slotbot-sync`, `7 * * * *` Europe/Madrid → `/jobs/sync`
+  (OIDC + `X-Job-Token`), also europe-west1.
+- **Neon** Postgres (Frankfurt), **direct** endpoint: through the pooler, `pg_restore` left an empty
+  `search_path`. Local data restored and checked (1 profile with credentials, 1 booking, 1 venue cache).
+- **Spending cap**: budget €10 on the project, email alerts at €1 / €5 / €10; Pub/Sub topic
+  `slotbot-budget` → push (OIDC, token in the query: push can't set headers) → `/jobs/budget`, which
+  detaches billing (`BillingKillSwitch`, Cloud Billing API, SA has `billing.projectManager`) once
+  cost ≥ budget. Benjamin's choice: "caps + alerts + kill switch at €10".
+- Artifact Registry cleanup: keep the last 2 images.
+- Local docker `api` stopped (the `db` container is still up) so two bots don't race each other.
+
+### Verified
+- Through the proxy: `/api/meta` (cloudtasks, email on); Test calendar → 4 events, 0 candidates;
+  Test login **from Google's servers** → Concepción, 14 Oct open, 28 free slots (the Madrid site
+  doesn't block cloud IPs).
+- `gcloud scheduler jobs run slotbot-sync` → `/jobs/sync` 200, calendar read.
+- Test budget message (0.50 / 10 EUR) → `/jobs/budget` 200, logged, billing untouched.
+- 29 tests, ruff clean.
+
+### Fixes found on the way
+- `/healthz` is reserved by Cloud Run's front end (404) → endpoint renamed `/health`.
+- gcloud's default project on this Mac is the work project → every command passes `--project`;
+  budgets also need `--billing-project` (ADC quota project is the work one too).
+- Pub/Sub push audience pinned to the bare service URL (Cloud Run rejects one with `?token=`).
+- Projects created before 2021: the Pub/Sub service agent needs `serviceAccountTokenCreator` on
+  the push identity.
+
+### Open items
+1. **Opening hour**: the probe for 15 Oct is still running on the Mac (`.probe-opening.log`). Then
+   set `SLOTBOT_MADRID_OPENS_AT` in Cloud Run (`gcloud run services update … --update-env-vars`) and `.env`.
+2. **First race in the cloud** (Cloud Tasks → `/jobs/race/{id}`) not yet seen: needs a candidate.
+   Use one ≥ 4 days ahead (free cancellation) and ask Benjamin before a real booking.
+3. Kill switch tested only below the cap (detaching billing for real would stop the bot).
+4. CD: GitHub Actions + Workload Identity Federation (deploy on push to main). Until then, redeploy
+   by hand (deploy/gcp.md §5).
+5. Every cold start runs `alembic upgrade head`, which wakes Neon, and budget pushes arrive
+   several times a day. Expected within Neon's free compute; check Neon's usage page after a week,
+   else run migrations in CD instead of at start.
+6. The job token shows in Cloud Run request logs for budget pushes (query string). Logs are
+   project-private; a dedicated budget token would contain it.
+7. `SLOTBOT_CONTACT_EMAIL` is empty (Nominatim sees "self-hosted"); meta shows bot identity
+   "default" under ambient credentials.
+
+---
+
 ## 2026-10-08 (afternoon) · v0.6: Upcoming list, cancel / reset, next wake
 
 - **Upcoming** (Bookings tab): next 10 of the bot's events (candidates and what became of them) with stage (candidate / pending / racing /
