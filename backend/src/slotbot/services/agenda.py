@@ -48,7 +48,6 @@ _ACTIONS = {
     "booked": ("cancel",),
     "failed": ("retry", "reset", "cancel"),
     "cancelled": ("reset",),
-    "other": ("reset",),  # "reset" turns any event into a candidate
 }
 
 
@@ -74,9 +73,10 @@ class AgendaService:
         self._next_sync = next_sync
 
     async def agenda(self, profile_id: int) -> Agenda:
+        """The next MAX_EVENTS events the bot deals with (candidates and what became of them)."""
         cfg, provider = await self._profile(profile_id)
         now = self._clock.now()
-        events = (await self._calendar.upcoming(cfg.calendar_id, now, cfg.lookahead_days))[:MAX_EVENTS]
+        events = await self._calendar.upcoming(cfg.calendar_id, now, cfg.lookahead_days)
         async with self._sessions() as db:
             rows = {
                 b.event_id: b
@@ -93,6 +93,10 @@ class AgendaService:
         for e in events:
             row = rows.get(e.id)
             stage = row.status if row else (stage_of(e.title, markers) or "other")
+            if stage == "other":  # the rest of the calendar is none of the bot's business
+                continue
+            if len(items) == MAX_EVENTS:
+                break
             if stage == "pending" and row is None:
                 stage = "candidate"  # titled pending but not planned yet: the next sync picks it up
             court = (row.result or {}).get("venue") if row and row.status == BookingStatus.BOOKED else None
@@ -101,9 +105,7 @@ class AgendaService:
                     event=e,
                     stage=stage,
                     booking_id=row.id if row else None,
-                    opens_at=row.opens_at
-                    if row
-                    else (provider.opens_at(e.start) if stage != "other" else None),
+                    opens_at=row.opens_at if row else provider.opens_at(e.start),
                     wakes_at=row.trigger_at if row and row.status == BookingStatus.PENDING else None,
                     court=court,
                     actions=_ACTIONS.get(stage, ()),

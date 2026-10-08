@@ -158,9 +158,8 @@ async def test_agenda_lists_stages_wake_time_and_allowed_actions(sessions, clock
     agenda = await (await agenda_for(sessions, clock, calendar, triggers, sync)).agenda(pid)
 
     stages = {i.event.id: (i.stage, i.actions) for i in agenda.items}
-    assert stages == {
+    assert stages == {  # "Dentist" is not the bot's business: left out
         "e1": ("pending", ("cancel", "reset")),
-        "e3": ("other", ("reset",)),
         "e2": ("candidate", ("cancel",)),
     }
     assert agenda.next_wake.event.id == "e1" and agenda.next_wake.wakes_at == booking.trigger_at

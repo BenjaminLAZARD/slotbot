@@ -16,7 +16,6 @@ const STAGE: Record<string, { label: string; variant: 'default' | 'secondary' | 
   booked: { label: 'booked', variant: 'default' },
   failed: { label: 'failed', variant: 'destructive' },
   cancelled: { label: 'cancelled', variant: 'outline' },
-  other: { label: 'not for the bot', variant: 'outline' },
 }
 
 const CONFIRM = {
@@ -44,7 +43,7 @@ export function UpcomingPanel({ profileId }: { profileId: number }) {
     <Card>
       <CardHeader>
         <CardTitle>Upcoming</CardTitle>
-        <CardDescription>The next events in your calendar and what the bot will do with them.</CardDescription>
+        <CardDescription>Your next candidate events and what the bot does with them (up to 10).</CardDescription>
         <CardAction>
           <Button variant="outline" size="sm" disabled={sync.isPending} onClick={() => sync.mutate(false)}>
             <RefreshCwIcon className={sync.isPending ? 'animate-spin' : ''} />
@@ -72,7 +71,10 @@ export function UpcomingPanel({ profileId }: { profileId: number }) {
         {agenda.error ? (
           <p className="text-sm text-destructive">{agenda.error.message}</p>
         ) : (data?.events.length ?? 0) === 0 ? (
-          <p className="text-sm text-muted-foreground">No upcoming events in this calendar.</p>
+          <p className="text-sm text-muted-foreground">
+            No upcoming candidates. Add an event whose title contains your candidate title (Settings), then
+            sync.
+          </p>
         ) : (
           <Table>
             <TableHeader>
@@ -108,7 +110,7 @@ export function UpcomingPanel({ profileId }: { profileId: number }) {
                         disabled={action.isPending || retry.isPending}
                         onClick={() => run(item, kind as 'cancel' | 'reset' | 'retry')}
                       >
-                        {kind === 'reset' ? (item.stage === 'other' ? 'Make candidate' : 'Reset') : kind[0].toUpperCase() + kind.slice(1)}
+                        {kind[0].toUpperCase() + kind.slice(1)}
                       </Button>
                     ))}
                   </TableCell>
