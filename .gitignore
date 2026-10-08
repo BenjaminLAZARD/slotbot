@@ -22,3 +22,6 @@ dist/
 
 # Local Claude Code settings
 .claude/settings.local.json
+
+# Opening-hour probe output
+.probe-*.log
