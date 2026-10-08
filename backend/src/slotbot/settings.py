@@ -33,7 +33,9 @@ class Settings(BaseSettings):
     triggers: Literal["local", "cloudtasks"] = "local"
     cloud_tasks_queue: str = ""  # projects/<project>/locations/<region>/queues/<queue>
     public_url: str = "http://localhost:8000"  # base URL Cloud Tasks calls back
-    job_token: str = ""  # shared secret expected in X-Job-Token on /jobs/*
+    job_token: str = ""  # shared secret expected in X-Job-Token (or ?token=) on /jobs/*
+    # GCP project whose billing the budget kill switch may disable (empty = kill switch off).
+    gcp_project: str = ""
 
     # Race timing.
     lead_minutes: int = 5  # wake up (and log in) this long before the booking window opens

@@ -189,3 +189,42 @@ async def test_cancel_a_booked_event_cancels_on_the_site_then_reset_makes_it_a_c
     await service.reset(pid, "e1")
     # e1 is a candidate again and, being the earliest, becomes the pending one once more
     assert calendar.events["e1"].title == "Pending Tennis"
+
+
+async def test_budget_notification_cuts_billing_only_at_the_cap():
+    import base64
+    import json
+
+    from fastapi.testclient import TestClient
+
+    from slotbot.api import jobs
+    from slotbot.api.deps import get_container
+
+    class Switch:
+        calls = 0
+
+        async def disable_billing(self) -> None:
+            Switch.calls += 1
+
+    class Settings:
+        job_token = "s3cret"
+
+    class Container:
+        settings = Settings()
+        kill_switch = Switch()
+
+    from fastapi import FastAPI
+
+    app = FastAPI()
+    app.include_router(jobs.router)
+    app.dependency_overrides[get_container] = lambda: Container()
+    client = TestClient(app)
+
+    def push(cost: float) -> dict:
+        data = base64.b64encode(json.dumps({"costAmount": cost, "budgetAmount": 10.0}).encode()).decode()
+        return {"message": {"data": data}, "subscription": "projects/p/subscriptions/s"}
+
+    assert client.post("/jobs/budget", json=push(12.0)).status_code == 403  # no token
+    assert client.post("/jobs/budget?token=s3cret", json=push(5.0)).json() == {"billing_disabled": False}
+    assert client.post("/jobs/budget?token=s3cret", json=push(10.0)).json() == {"billing_disabled": True}
+    assert Switch.calls == 1

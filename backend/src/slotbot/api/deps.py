@@ -17,9 +17,11 @@ async def get_db(c: Annotated[Container, Depends(get_container)]) -> AsyncIterat
 
 
 def require_job_token(request: Request, c: Annotated[Container, Depends(get_container)]) -> None:
-    """Cloud Tasks / Cloud Scheduler send the shared secret; local mode may leave it empty."""
+    """Schedulers send the shared secret (header or ?token=); local mode may leave it empty."""
     expected = c.settings.job_token
-    if expected and request.headers.get("X-Job-Token") != expected:
+    # Header for Cloud Tasks / Scheduler; query parameter for Pub/Sub push, which can't set headers.
+    given = request.headers.get("X-Job-Token") or request.query_params.get("token")
+    if expected and given != expected:
         raise HTTPException(403, "bad job token")
 
 

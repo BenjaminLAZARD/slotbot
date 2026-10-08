@@ -64,7 +64,7 @@ export function UpcomingPanel({ profileId }: { profileId: number }) {
             )}
           </span>
           <span className="text-muted-foreground">
-            Next calendar check: {data?.next_sync ? fromNow(data.next_sync) : 'daily (scheduler)'}
+            Next calendar check: {data?.next_sync ? fromNow(data.next_sync) : 'hourly (Cloud Scheduler)'}
           </span>
         </div>
 

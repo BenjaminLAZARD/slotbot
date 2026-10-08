@@ -6,6 +6,7 @@ from datetime import timedelta
 import httpx
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 
+from slotbot.adapters.billing import BillingKillSwitch
 from slotbot.adapters.clock import SystemClock
 from slotbot.adapters.email import ResendNotifier, SmtpNotifier
 from slotbot.adapters.geocoder import Nominatim
@@ -41,6 +42,7 @@ class Container:
     race: RaceService
     agenda: AgendaService
     notifier: Notifier | None
+    kill_switch: BillingKillSwitch | None
     local_loop: LocalLoop | None
 
 
@@ -116,5 +118,6 @@ def build_container(settings: Settings, http: httpx.AsyncClient) -> Container:
         race=race,
         agenda=agenda,
         notifier=notifier,
+        kill_switch=BillingKillSwitch(http, google, settings.gcp_project) if settings.gcp_project else None,
         local_loop=local_loop,
     )
