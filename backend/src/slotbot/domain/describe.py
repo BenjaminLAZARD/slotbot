@@ -80,6 +80,24 @@ def result_lines(plan: Plan, report: RaceReport) -> list[str]:
     ]
 
 
+def notification(plan: Plan, report: RaceReport) -> tuple[str, str]:
+    """Subject and plain-text body telling the player how the race went."""
+    if report.booked:
+        subject = f"Booked: {report.booked.label}, {_day(report.booked.start)}"
+    else:
+        subject = f"Not booked: {plan.event.title.strip()}, {_day(plan.window.preferred)}"
+    lines = result_lines(plan, report)
+    if report.balance_low:
+        subject += " · top up your wallet"
+        lines = [
+            f"⚠ Balance left ({report.balance:.2f} €) is below the price just paid ({report.price:.2f} €): "
+            "top it up before the next booking.",
+            "",
+            *lines,
+        ]
+    return subject, "\n".join(lines)
+
+
 def _day(dt: datetime) -> str:
     return f"{dt:%a %d %b %H:%M}"
 

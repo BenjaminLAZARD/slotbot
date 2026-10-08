@@ -139,6 +139,17 @@ export function useCheckLogin(profileId: number) {
   })
 }
 
+export function useTestNotification(profileId: number) {
+  return useMutation({
+    mutationFn: () =>
+      call(
+        api.POST('/api/profiles/{profile_id}/test-notification', { params: { path: { profile_id: profileId } } }),
+      ),
+    onSuccess: () => toast.success('Test email sent: check your inbox'),
+    onError,
+  })
+}
+
 export function useCheckCalendar(profileId: number) {
   const qc = useQueryClient()
   return useMutation({

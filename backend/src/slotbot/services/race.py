@@ -11,11 +11,11 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from slotbot.adapters.clock import sleep_until
 from slotbot.adapters.vault import Vault
-from slotbot.domain.describe import compose, result_lines, retitle
+from slotbot.domain.describe import compose, notification, result_lines, retitle
 from slotbot.domain.ranking import candidates
 from slotbot.domain.types import Attempt, BookingResult, Outcome, Plan, RaceReport, Slot
 from slotbot.models import Booking, BookingStatus, Profile, utcnow
-from slotbot.ports import Calendar, Clock, EventChanges, Provider, ProviderSession
+from slotbot.ports import Calendar, Clock, EventChanges, Notifier, Provider, ProviderSession
 from slotbot.providers import ProviderRegistry
 from slotbot.schemas import ProfileConfig
 from slotbot.services.planner import Planner
@@ -71,7 +71,7 @@ async def run_race(plan: Plan, session: ProviderSession, clock: Clock, timing: T
             continue
         result = await journal.book(session, slot)
         if result.outcome is Outcome.BOOKED:
-            return journal.report("", slot, result.reference, note=result.detail)
+            return journal.report("", slot, result)
         if result.outcome is Outcome.TAKEN:
             refused.add((slot.venue.id, slot.court, slot.start))
         else:
@@ -137,9 +137,19 @@ class _Journal:
         return result
 
     def report(
-        self, reason: str, booked: Slot | None = None, reference: str = "", note: str = ""
+        self, reason: str, booked: Slot | None = None, result: BookingResult | None = None
     ) -> RaceReport:
-        return RaceReport(booked, reference, tuple(self.attempts), reason, note)
+        if result is None:
+            return RaceReport(booked, "", tuple(self.attempts), reason)
+        return RaceReport(
+            booked,
+            result.reference,
+            tuple(self.attempts),
+            reason,
+            result.detail,
+            result.price,
+            result.balance,
+        )
 
 
 class RaceService:
@@ -155,6 +165,7 @@ class RaceService:
         clock: Clock,
         timing: Timing,
         sync: SyncService,
+        notifier: Notifier | None = None,
     ):
         self._sessions = sessions
         self._calendar = calendar
@@ -164,6 +175,7 @@ class RaceService:
         self._clock = clock
         self._timing = timing
         self._sync = sync
+        self._notifier = notifier
 
     async def run(self, booking_id: int) -> None:
         async with self._sessions() as db:
@@ -190,14 +202,25 @@ class RaceService:
             report = await self._race(plan, provider, profile.credentials)
         except Exception as e:
             log.exception("race for booking %s failed before completing", booking_id)
-            await self._save(booking_id, BookingStatus.FAILED, {"reason": f"{type(e).__name__}: {e}"}, ())
+            reason = f"{type(e).__name__}: {e}"
+            await self._save(booking_id, BookingStatus.FAILED, {"reason": reason}, ())
+            await self._notify(cfg, f"Not booked: {booking.title}", f"The bot could not race: {reason}")
             return
 
         await self._record(booking_id, cfg, plan, report)
+        await self._notify(cfg, *notification(plan, report))
         try:
             await self._sync.sync_profile(profile.id, refresh_venues=True)  # prepare the next event
         except Exception:
             log.exception("post-race sync failed for profile %s", profile.id)
+
+    async def _notify(self, cfg: ProfileConfig, subject: str, body: str) -> None:
+        if not (self._notifier and cfg.notify_email):
+            return
+        try:
+            await self._notifier.send(cfg.notify_email, subject, body)
+        except Exception:  # a failed email must never hide the booking result
+            log.exception("could not send the notification to %s", cfg.notify_email)
 
     async def _race(self, plan: Plan, provider: Provider, sealed: str | None) -> RaceReport:
         creds = self._vault.open(sealed) if sealed else {}

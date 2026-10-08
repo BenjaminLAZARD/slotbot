@@ -12,6 +12,7 @@ async def meta(c: C) -> MetaOut:
     return MetaOut(
         service_account_email=c.google.email,
         triggers=c.settings.triggers,
+        email_enabled=c.notifier is not None,
         providers=[
             ProviderOut(key=p.key, label=p.label, credential_fields=list(p.credential_fields))
             for p in c.providers.all()

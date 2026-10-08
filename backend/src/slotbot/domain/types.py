@@ -61,6 +61,8 @@ class BookingResult:
     outcome: Outcome
     detail: str = ""
     reference: str = ""
+    price: float | None = None  # amount paid, when the provider reports it
+    balance: float | None = None  # prepaid balance left afterwards, when the provider has one
 
 
 @dataclass(frozen=True)
@@ -111,3 +113,10 @@ class RaceReport:
     attempts: tuple[Attempt, ...]
     reason: str = ""
     note: str = ""  # e.g. what was paid and the remaining balance
+    price: float | None = None
+    balance: float | None = None
+
+    @property
+    def balance_low(self) -> bool:
+        """The balance left would not pay for the same booking again."""
+        return self.balance is not None and self.price is not None and self.balance < self.price

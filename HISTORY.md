@@ -6,6 +6,39 @@ entry at the top at the end of each working session.
 
 ---
 
+## 2026-10-08 (late morning) · v0.4: setup checks, unsaved-changes bar, email notifications
+
+### Why
+- Benjamin "couldn't edit his profile": the Save button sat at the bottom of a long form with no
+  unsaved-changes cue, so edits were never submitted (API log showed no PUT).
+- The setup card claimed the calendar was shared just because an ID was set; in fact Google returned
+  404 on events.list for the service account = calendar not shared with it (diagnosed with the bot's
+  own token; 403 on calendar metadata is only our narrow `calendar.events` scope).
+- Benjamin wants notifications, free and simple → Gmail SMTP with an app password (chosen by Claude on
+  his request for advice: no new account, lands in his inbox). Events: booked, failed, wallet below the
+  last price paid.
+
+### Changes
+- UI: sticky "Unsaved changes · Discard / Save" bar; setup card driven by real checks; "Test
+  calendar" button; toasts at top; email field + "Send test email".
+- API: `POST /check-calendar`, `POST /test-notification`; `calendar_ok_at` / `login_ok_at` on profiles
+  (migration `9b1c957139b3`), reset when the calendar ID / credentials change; calendar 403/404 →
+  clear message naming the service account to share with; `MetaOut.email_enabled`.
+- Notifier port + `SmtpNotifier`; `RaceService` emails the result (`describe.notification`), never
+  letting an email failure hide the booking result. `BookingResult`/`RaceReport` carry price and
+  balance; `RaceReport.balance_low`.
+- Dev: hot-reload polling every 5 s (Benjamin's request; the Mac was overloaded, mostly by Chrome).
+- 22 tests.
+
+### Open items
+1. Benjamin: share the calendar with `slotbot@divine-camera-228017.iam.gserviceaccount.com` ("Make
+   changes to events") → Test calendar. Bike speed is set to 5 km/h (likely a typo for 15).
+2. Benjamin: Gmail app password in `.env` → Send test email. Re-run Test login (column is new).
+3. Opening-hour probe for 15 Oct still running.
+4. First real bot run; then GCP deploy.
+
+---
+
 ## 2026-10-08 · v0.3: payment from the Madrid wallet
 
 ### Decisions

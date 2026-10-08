@@ -91,6 +91,19 @@ async def check_calendar(profile_id: int, db: DB, c: C) -> CalendarCheckOut:
     return CalendarCheckOut(events=len(events), candidates=len(marked))
 
 
+@router.post("/{profile_id}/test-notification", status_code=204)
+async def test_notification(profile_id: int, db: DB, c: C) -> None:
+    cfg = ProfileConfig.model_validate((await _load(db, profile_id)).config)
+    if c.notifier is None:
+        raise HTTPException(422, "email is off: set SLOTBOT_SMTP_USER and SLOTBOT_SMTP_PASSWORD in .env")
+    if not cfg.notify_email:
+        raise HTTPException(422, "set a notification email in the profile first")
+    try:
+        await c.notifier.send(cfg.notify_email, "slotbot test", "Emails from slotbot reach you. 🎾")
+    except Exception as e:
+        raise HTTPException(502, f"could not send: {type(e).__name__}: {e}") from None
+
+
 @router.post("/{profile_id}/check-login")
 async def check_login(profile_id: int, db: DB, c: C) -> LoginCheckOut:
     """Log in with the stored credentials and read the closest venue's furthest open day. Books nothing."""

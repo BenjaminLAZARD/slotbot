@@ -167,7 +167,7 @@ class MadridSession:
         note = f"paid {cart.total:.2f} € from the wallet, {left:.2f} € left"
         if left < cart.total:
             note += " (top it up before the next booking)"
-        return BookingResult(Outcome.BOOKED, note, reference=cart_code)
+        return BookingResult(Outcome.BOOKED, note, reference=cart_code, price=cart.total, balance=left)
 
     async def _select(self, facility: str) -> None:
         if self._web.page is None or "ReservaEspacios" not in self._web.page.url:

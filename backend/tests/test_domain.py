@@ -68,6 +68,26 @@ def test_compose_keeps_user_text_and_replaces_bot_section():
     assert "<br>" in compose("<b>latest</b>: 21:00", ["x"])
 
 
+def test_notification_flags_a_wallet_that_cannot_pay_the_next_booking():
+    from slotbot.domain.describe import notification
+    from slotbot.domain.types import CalendarEvent, Plan, RaceReport
+
+    start = at(19)
+    plan = Plan(
+        CalendarEvent("e", "Candidate Tennis", start, at(20)),
+        "Sol",
+        (RankedVenue(NEAR, 8),),
+        window(start, 0, None, Constraints()),
+        at(0, day=7),
+    )
+    slot = Slot(NEAR, start, at(20), court="Tenis 2")
+    subject, body = notification(plan, RaceReport(slot, "8126131707", (), price=6.9, balance=3.1))
+    assert subject == "Booked: CDM La Chopera · Tenis 2, Tue 13 Oct 19:00 · top up your wallet"
+    assert body.startswith("⚠ Balance left (3.10 €) is below the price just paid (6.90 €)")
+    subject, _ = notification(plan, RaceReport(None, "", (), "every acceptable slot was taken"))
+    assert subject == "Not booked: Candidate Tennis, Tue 13 Oct 19:00"
+
+
 def test_retitle_keeps_the_rest_of_the_title():
     assert retitle("Candidate Tennis w/ Ana", "Pending Tennis", "candidate tennis") == "Pending Tennis w/ Ana"
     assert retitle("Something else", "Success - Tennis", "Pending Tennis") == "Success - Tennis"

@@ -78,6 +78,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/profiles/{profile_id}/test-notification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Test Notification */
+        post: operations["test_notification_api_profiles__profile_id__test_notification_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/profiles/{profile_id}/check-login": {
         parameters: {
             query?: never;
@@ -327,6 +344,8 @@ export interface components {
             service_account_email: string;
             /** Triggers */
             triggers: string;
+            /** Email Enabled */
+            email_enabled: boolean;
             /** Providers */
             providers: components["schemas"]["ProviderOut"][];
         };
@@ -385,6 +404,12 @@ export interface components {
              * @default 30
              */
             lookahead_days: number;
+            /**
+             * Notify Email
+             * @description Where to email results; empty = no emails
+             * @default
+             */
+            notify_email: string;
         };
         /** ProfileIn */
         ProfileIn: {
@@ -674,6 +699,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CalendarCheckOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_notification_api_profiles__profile_id__test_notification_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

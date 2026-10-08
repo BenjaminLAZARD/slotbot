@@ -28,15 +28,23 @@ def event(eid: str, title: str, day: int, hour: int = 19, description: str = "")
     return CalendarEvent(eid, title, start, start + timedelta(hours=1), "Sol, Madrid", description)
 
 
-async def build(sessions, clock, events):
+class FakeNotifier:
+    def __init__(self) -> None:
+        self.sent: list[tuple[str, str, str]] = []
+
+    async def send(self, to: str, subject: str, body: str) -> None:
+        self.sent.append((to, subject, body))
+
+
+async def build(sessions, clock, events, notifier: FakeNotifier | None = None):
     calendar, triggers = FakeCalendar(events), FakeTriggers()
     providers = ProviderRegistry([DemoProvider()])
     planner = Planner(FakeGeocoder(), VenueCatalogue(sessions, clock))
     sync = SyncService(sessions, calendar, planner, providers, triggers, clock, TIMING.lead)
     vault = Vault(Fernet.generate_key().decode())
-    race = RaceService(sessions, calendar, planner, providers, vault, clock, TIMING, sync)
+    race = RaceService(sessions, calendar, planner, providers, vault, clock, TIMING, sync, notifier)
     async with sessions() as db:
-        cfg = ProfileConfig(calendar_id="cal", provider="demo")
+        cfg = ProfileConfig(calendar_id="cal", provider="demo", notify_email="me@example.com")
         profile = Profile(name="me", config=cfg.model_dump())
         db.add(profile)
         await db.commit()
@@ -69,12 +77,17 @@ async def test_sync_marks_next_candidate_pending_and_schedules_trigger(sessions,
 
 async def test_race_books_writes_back_and_promotes_next_event(sessions, clock):
     events = [event("e1", "Candidate Tennis", 13), event("e2", "Candidate Tennis", 15)]
-    calendar, triggers, sync, race, pid = await build(sessions, clock, events)
+    notifier = FakeNotifier()
+    calendar, triggers, sync, race, pid = await build(sessions, clock, events, notifier)
     booking = await sync.sync_profile(pid)
     clock.current = booking.trigger_at
 
     await race.run(booking.id)
 
+    [(to, subject, body)] = notifier.sent
+    assert to == "me@example.com"
+    assert subject == "Booked: Demo Court B (Casa de Campo) · Court 1, Tue 13 Oct 19:00"
+    assert "taken" in body  # the attempts are in the email too
     e1 = calendar.events["e1"]
     assert e1.title == "Success - Tennis"
     assert e1.start.hour == 19 and e1.location.startswith("Demo Court B")  # A refused once by demo

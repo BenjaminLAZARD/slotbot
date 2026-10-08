@@ -18,6 +18,13 @@ class Settings(BaseSettings):
     # Shown to Nominatim (OpenStreetMap geocoder), whose usage policy asks for a contact.
     contact_email: str = ""
 
+    # Email notifications via SMTP; empty user = notifications off. With Gmail: an "app password"
+    # (Google account > Security > 2-Step Verification > App passwords), never your real password.
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+
     # How race triggers are scheduled: in-process timers (local dev) or Google Cloud Tasks.
     triggers: Literal["local", "cloudtasks"] = "local"
     cloud_tasks_queue: str = ""  # projects/<project>/locations/<region>/queues/<queue>

@@ -39,6 +39,7 @@ class ProfileConfig(BaseModel):
     weekend: Flex = Flex(before_minutes=120, after_minutes=120)
     titles: Titles = Titles()
     lookahead_days: int = Field(30, ge=7, le=90)
+    notify_email: str = Field("", description="Where to email results; empty = no emails")
 
 
 class ProfileIn(BaseModel):
@@ -100,4 +101,5 @@ class ProviderOut(BaseModel):
 class MetaOut(BaseModel):
     service_account_email: str
     triggers: str
+    email_enabled: bool  # SMTP configured on this instance
     providers: list[ProviderOut]

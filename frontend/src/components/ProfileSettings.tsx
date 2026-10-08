@@ -1,6 +1,13 @@
 import { useState, type ReactNode } from 'react'
 import type { Profile, ProfileConfig } from '@/api/client'
-import { useCheckLogin, useDeleteProfile, useMeta, useSaveProfile, useSetCredentials } from '@/api/hooks'
+import {
+  useCheckLogin,
+  useDeleteProfile,
+  useMeta,
+  useSaveProfile,
+  useSetCredentials,
+  useTestNotification,
+} from '@/api/hooks'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -24,6 +31,7 @@ const DEFAULTS: ProfileConfig = {
     failure: 'Failure - Tennis',
   },
   lookahead_days: 30,
+  notify_email: '',
 }
 
 type Props = { profile: Profile | null; onSaved: (id: number) => void; onDeleted: () => void }
@@ -32,6 +40,7 @@ export function ProfileSettings({ profile, onSaved, onDeleted }: Props) {
   const meta = useMeta()
   const save = useSaveProfile()
   const remove = useDeleteProfile()
+  const testEmail = useTestNotification(profile?.id ?? 0)
   const [name, setName] = useState(profile?.name ?? 'Me')
   const [cfg, setCfg] = useState<ProfileConfig>(profile?.config ?? DEFAULTS)
   const set = <K extends keyof ProfileConfig>(key: K, value: ProfileConfig[K]) =>
@@ -126,6 +135,34 @@ export function ProfileSettings({ profile, onSaved, onDeleted }: Props) {
               </Field>
             ))}
           </div>
+
+          <Separator />
+          <Field
+            label="Email me results"
+            hint={
+              meta.data?.email_enabled
+                ? 'Booked, failed, and when the wallet drops below the last price paid. Leave empty for no emails.'
+                : 'Email is off on this instance: set SLOTBOT_SMTP_USER and SLOTBOT_SMTP_PASSWORD in .env (see README).'
+            }
+          >
+            <div className="flex gap-2">
+              <Input
+                type="email"
+                value={cfg.notify_email ?? ''}
+                placeholder="you@gmail.com"
+                onChange={(e) => set('notify_email', e.target.value)}
+              />
+              {profile && (
+                <Button
+                  variant="outline"
+                  disabled={!meta.data?.email_enabled || !profile.config.notify_email || testEmail.isPending}
+                  onClick={() => testEmail.mutate()}
+                >
+                  {testEmail.isPending ? 'Sending…' : 'Send test email'}
+                </Button>
+              )}
+            </div>
+          </Field>
         </CardContent>
         <CardFooter className="justify-between">
           {profile ? (

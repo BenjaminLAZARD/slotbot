@@ -103,6 +103,28 @@ Both services hot-reload inside the containers (polling-based, so edits on the h
 
 After changing API models, regenerate the frontend's types: `cd frontend && npm run gen:api`.
 
+### Email notifications
+
+The bot emails you when it books (court, time, price), when it fails (reason + attempts), and flags
+when the wallet balance left is below the price just paid. It sends through any SMTP account; the
+simplest is your own Gmail sending to yourself:
+
+1. Google account → Security → turn on **2-Step Verification**.
+2. Create an **app password** at <https://myaccount.google.com/apppasswords> (name it "slotbot").
+3. In `.env`: `SLOTBOT_SMTP_USER=you@gmail.com` and `SLOTBOT_SMTP_PASSWORD=<the 16-letter app password>`,
+   then `docker compose up -d api`.
+4. In the UI → Settings: fill **Email me results**, save, press **Send test email**.
+
+## Running it so it books for you
+
+The UI and the bot are one program: the API process holds the booking timers. It books only while it
+runs, at the daily sync and at each trigger (5 min before a booking window opens).
+
+- **On your Mac:** `docker compose up -d`, keep the Mac plugged in and awake (System Settings → Battery
+  → Options → prevent automatic sleeping on power adapter). Optional wake-up safety net:
+  `sudo pmset repeat wakeorpoweron MTWRFSU 23:45:00`.
+- **In the cloud:** see below; nothing needs to run on your machine.
+
 ## Deploying (scale-to-zero on Google Cloud)
 
 Nothing runs 24/7: Cloud Run hosts the container and scales to zero, **Cloud Tasks** calls

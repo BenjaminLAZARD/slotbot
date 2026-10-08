@@ -7,12 +7,13 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 
 from slotbot.adapters.clock import SystemClock
+from slotbot.adapters.email import SmtpNotifier
 from slotbot.adapters.geocoder import Nominatim
 from slotbot.adapters.google_auth import GoogleToken
 from slotbot.adapters.google_calendar import GoogleCalendar
 from slotbot.adapters.triggers import CloudTasksTriggers, LocalTriggers
 from slotbot.adapters.vault import Vault
-from slotbot.ports import Calendar, Clock, Geocoder, Triggers
+from slotbot.ports import Calendar, Clock, Geocoder, Notifier, Triggers
 from slotbot.providers import ProviderRegistry, build_registry
 from slotbot.services.local_loop import LocalLoop
 from slotbot.services.planner import Planner
@@ -37,6 +38,7 @@ class Container:
     catalogue: VenueCatalogue
     sync: SyncService
     race: RaceService
+    notifier: Notifier | None
     local_loop: LocalLoop | None
 
 
@@ -67,8 +69,14 @@ def build_container(settings: Settings, http: httpx.AsyncClient) -> Container:
     else:
         triggers = LocalTriggers(clock)
 
+    notifier: Notifier | None = None
+    if settings.smtp_user:
+        notifier = SmtpNotifier(
+            settings.smtp_host, settings.smtp_port, settings.smtp_user, settings.smtp_password
+        )
+
     sync = SyncService(sessions, calendar, planner, providers, triggers, clock, timing.lead)
-    race = RaceService(sessions, calendar, planner, providers, vault, clock, timing, sync)
+    race = RaceService(sessions, calendar, planner, providers, vault, clock, timing, sync, notifier)
 
     local_loop = None
     if isinstance(triggers, LocalTriggers):
@@ -90,5 +98,6 @@ def build_container(settings: Settings, http: httpx.AsyncClient) -> Container:
         catalogue=catalogue,
         sync=sync,
         race=race,
+        notifier=notifier,
         local_loop=local_loop,
     )

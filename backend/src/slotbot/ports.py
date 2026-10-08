@@ -71,6 +71,12 @@ class Triggers(Protocol):
     async def cancel(self, ref: str) -> None: ...
 
 
+class Notifier(Protocol):
+    """Tells a person what happened (email today; push or chat could implement it too)."""
+
+    async def send(self, to: str, subject: str, body: str) -> None: ...
+
+
 class Clock(Protocol):
     def now(self) -> datetime: ...
 
