@@ -104,6 +104,15 @@ def page_texts(page_html: str) -> list[str]:
     return [html.unescape(t.replace("\\'", "'")) for t in _TEXT.findall(page_html)]
 
 
+_PERSON = re.compile(r'person_code\\?"\s*:\s*\\?"([^"\\]+)')
+
+
+def person_code(text: str) -> str | None:
+    """The signed-in person's code, from `{"person_code":"…"}` JSON (possibly backslash-escaped)."""
+    m = _PERSON.search(text)
+    return m.group(1) if m else None
+
+
 def euros(text: str | None) -> float | None:
     m = re.match(r"^\s*(\d+(?:[.,]\d+)?)\s*€", text or "")
     return float(m.group(1).replace(",", ".")) if m else None
@@ -214,8 +223,7 @@ class DeportesWeb:
         r = await self._http.get(urljoin(BASE, path_or_url))
         r.raise_for_status()
         self.page, self.html = Page(str(r.url), form_fields(r.text)), r.text
-        if m := re.search(r'person_code\\?"\s*:\s*\\?"([^"\\]+)', r.text):  # JSON, possibly escaped
-            self.person_code = m.group(1)
+        self.person_code = person_code(r.text) or self.person_code
         return self.page
 
     async def postback(
@@ -246,6 +254,8 @@ class DeportesWeb:
         for panel in delta.panels.values():  # inputs rendered in refreshed panels join the form
             self.page.fields.update(form_fields(panel))
         self.page.fields.update(delta.hidden)
+        # The signed-in person's code arrives in a script of the centre-selection response.
+        self.person_code = person_code(delta.text) or self.person_code
         if delta.error:
             raise SiteError(delta.error)
         return delta
@@ -277,6 +287,8 @@ class DeportesWeb:
         if "uLoginVerification" in delta.text and not delta.redirect:
             raise SiteError("the site asks for an emailed verification code; log in once in a browser first")
         await self.follow(delta)
+        if "MiCuenta" not in self.html:  # the account menu only exists for a signed-in person
+            raise SiteError("login did not stick: the site still shows us as anonymous")
 
     async def browse_anonymously(self) -> None:
         await self.open("login")
@@ -360,6 +372,8 @@ class DeportesWeb:
 
     async def reserve(self, cell: GridCell, light: bool) -> Delta:
         """Select one cell and press "Reservar"; on success the site redirects to the cart."""
+        if not self.person_code:  # the site would answer "Para acceder ... es necesario identificarse"
+            raise SiteError("signed-in person unknown: open a centre before reserving")
         flag = ("true" if light else "false") if cell.asks_light else "?"
         return await self.postback(
             "uAlert_uplAlert",

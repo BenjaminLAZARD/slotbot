@@ -10,8 +10,21 @@ from slotbot.providers.deportesweb import (
     page_texts,
     parse_cart,
     parse_delta,
+    person_code,
 )
 from slotbot.providers.madrid import _key, _plain_address
+
+
+def test_person_code_is_read_from_the_centre_selection_script():
+    # Shaped like the SelectFacility response of a signed-in session (2026-10-08).
+    script = (
+        "function ContentFixedSection_uReservaEspacios_uUsosSeleccionar_callbackCargar() { "
+        '$(\'.cronos-reservations\').data(\'profile\', {"session_token":"aa","identifier":"ME@X.COM",'
+        '"person_code":"ff622b96","person_firstname":"Me"});'
+    )
+    assert person_code(script) == "ff622b96"
+    assert person_code('{\\"person_code\\":\\"ab12\\"}') == "ab12"  # escaped JSON in a full page
+    assert person_code("let personCode = null; if (profile) personCode = profile.person_code;") is None
 
 
 def test_cart_page_reads_items_total_and_wallet_balance():

@@ -14,6 +14,7 @@ from slotbot.adapters.vault import Vault
 from slotbot.domain.describe import compose, notification, result_lines, retitle
 from slotbot.domain.ranking import candidates
 from slotbot.domain.types import Attempt, BookingResult, Outcome, Plan, RaceReport, Slot
+from slotbot.errors import AbortRace
 from slotbot.models import Booking, BookingStatus, Profile, utcnow
 from slotbot.ports import Calendar, Clock, EventChanges, Notifier, Provider, ProviderSession
 from slotbot.providers import ProviderRegistry
@@ -44,13 +45,22 @@ async def run_race(plan: Plan, session: ProviderSession, clock: Clock, timing: T
     2. Once open: walk candidates in order — requested time first, then nearest times; closest
        venue first within a time — loading each venue's availability only when needed. Stops on
        the first booking, or when every acceptable slot was refused ("rejection").
-    Network errors are logged once and retried until `retry_for` after opening.
+    Network errors are logged once and retried until `retry_for` after opening; an `AbortRace`
+    from the provider (not signed in, account suspended) ends the race at once.
     """
     if not plan.venues:
         return RaceReport(None, "", (), "no venue in bike range")
-    day = plan.window.preferred.date()
     journal = _Journal(clock)
+    try:
+        return await _race(plan, session, clock, timing, journal)
+    except AbortRace as e:
+        return journal.report(f"stopped: {e}")
 
+
+async def _race(
+    plan: Plan, session: ProviderSession, clock: Clock, timing: Timing, journal: "_Journal"
+) -> RaceReport:
+    day = plan.window.preferred.date()
     await sleep_until(clock, plan.opens_at - timing.poll_start, chunk=timing.poll_every)
     deadline = max(plan.opens_at, clock.now()) + timing.retry_for
 
@@ -116,7 +126,7 @@ class _Journal:
     async def call(self, what: str, step: Awaitable[T], default: T) -> T:
         try:
             return await step
-        except NotImplementedError:
+        except (NotImplementedError, AbortRace):
             raise
         except Exception as e:  # an overloaded server right at opening is normal; keep going
             if (error := f"{what}: {type(e).__name__}: {e}") != self._last_error:
@@ -127,6 +137,9 @@ class _Journal:
     async def book(self, session: ProviderSession, slot: Slot) -> BookingResult:
         try:
             result = await session.book(slot)
+        except AbortRace as e:
+            self.attempts.append(Attempt(self._clock.now(), slot.label, slot.start, Outcome.ERROR, str(e)))
+            raise
         except NotImplementedError:
             raise
         except Exception as e:

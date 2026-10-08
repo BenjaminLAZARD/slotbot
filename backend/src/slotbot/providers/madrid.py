@@ -21,6 +21,7 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from slotbot.domain.types import BookingResult, GeoPoint, Outcome, Slot, Venue
+from slotbot.errors import AbortRace
 from slotbot.ports import Geocoder
 from slotbot.providers.deportesweb import (
     WALLET,
@@ -142,7 +143,10 @@ class MadridSession:
         reserved = await self._web.reserve(cell, self._light)
         self._facility = self._loaded = None  # the next step leaves the tennis page
         if not reserved.redirect:
-            return BookingResult(Outcome.TAKEN, alert_text(reserved) or "refused by the site")
+            alert = alert_text(reserved) or "refused by the site"
+            if re.search(r"identific|suspendid|suspensi", alert, re.I):  # not about this slot: stop
+                raise AbortRace(f"the site refused the account: {alert}")
+            return BookingResult(Outcome.TAKEN, alert)
         await self._web.follow(reserved)
 
         cart = parse_cart(self._web.html)
@@ -174,6 +178,8 @@ class MadridSession:
             await self._web.open_tennis()  # back from the cart after a refused payment
         self._usage = await self._web.select_facility(facility)
         self._facility, self._loaded = facility, None
+        if not self._web.person_code:  # sent with every reservation; without it the site refuses
+            raise AbortRace("signed in, but the site did not return the account's person code")
 
 
 def _key(name: str) -> str:

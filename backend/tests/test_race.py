@@ -93,6 +93,21 @@ async def test_stops_on_rejection_without_retrying_refused_slots(clock):
     assert clock.now() == OPENS  # a rejection ends the race at once
 
 
+async def test_an_account_problem_stops_the_race_at_once(clock):
+    from slotbot.errors import AbortRace
+
+    class SignedOut(Session):
+        async def book(self, slot: Slot) -> BookingResult:
+            raise AbortRace("the site refused the account: Para acceder ... es necesario identificarse")
+
+    clock.current = OPENS
+    report = await run_race(plan(), SignedOut(clock, taken=set()), clock, TIMING)
+
+    assert report.booked is None
+    assert report.reason.startswith("stopped: the site refused the account")
+    assert len(report.attempts) == 1  # no burst of retries on other courts/times
+
+
 async def test_gives_up_if_the_window_never_opens(clock):
     clock.current = OPENS
     report = await run_race(plan(), Session(clock, taken=set(), opens=None), clock, TIMING)
