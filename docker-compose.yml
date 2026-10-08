@@ -31,6 +31,7 @@ services:
       SLOTBOT_DATABASE_URL: postgresql+asyncpg://slotbot:slotbot@db:5432/slotbot
       SLOTBOT_GOOGLE_SERVICE_ACCOUNT: /secrets/google-service-account.json
       WATCHFILES_FORCE_POLLING: "true"  # bind-mounted files don't always emit change events
+      WATCHFILES_POLL_DELAY_MS: "1000"  # default 300 ms costs noticeable CPU
     volumes:
       - ./backend/src:/app/src
       - ./backend/migrations:/app/migrations

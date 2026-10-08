@@ -12,6 +12,6 @@ export default defineConfig({
   server: {
     proxy: { '/api': api },
     // Inside docker compose, file events from the bind mount are unreliable: poll instead.
-    watch: process.env.VITE_USE_POLLING ? { usePolling: true, interval: 300 } : undefined,
+    watch: process.env.VITE_USE_POLLING ? { usePolling: true, interval: 1000 } : undefined,
   },
 })
