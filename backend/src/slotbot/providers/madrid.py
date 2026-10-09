@@ -48,7 +48,7 @@ class MadridTennis:
         geocoder: Geocoder,
         opens_at: str = "00:00",
         days_before: int = 6,
-        light: bool = True,
+        light: bool = False,
     ):
         self._http = http
         self._geocoder = geocoder

@@ -14,6 +14,9 @@ entry at the top at the end of each working session.
   later, but the wallet held €10.00 for a **€10.60** court (La Elipa was €6.90; probably floodlights,
   not verified). The bot stopped without paying ("Failure - Tennis", email sent; the cart expired).
 - The low-wallet warning compares with the *last price paid* (€6.90), so it didn't fire.
+- **Floodlights now declined by default** (Benjamin): `madrid_request_light` defaults to false, and
+  `SLOTBOT_MADRID_REQUEST_LIGHT=false` is set on Cloud Run (env-only update, same image).
+  Late slots after dusk will be dark without them.
 
 ### Sign-in (Benjamin's choice: Google sign-in, public site, landing page)
 - `users` table + `profiles.owner_id` (migration `c4e1a7d2f9b0`). `AccountService`: verify the
