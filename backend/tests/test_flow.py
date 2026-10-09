@@ -208,6 +208,7 @@ async def test_budget_notification_cuts_billing_only_at_the_cap():
 
     class Settings:
         job_token = "s3cret"
+        job_caller = ""
 
     class Container:
         settings = Settings()

@@ -10,8 +10,9 @@ import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 
-from slotbot.api import agenda, bookings, jobs, meta, profiles
+from slotbot.api import agenda, auth, bookings, jobs, meta, profiles
 from slotbot.container import build_container
 from slotbot.errors import ConfigError
 from slotbot.settings import Settings
@@ -34,8 +35,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await container.engine.dispose()
 
     app = FastAPI(title="slotbot", lifespan=lifespan)
-    for module in (profiles, agenda, bookings, jobs, meta):
+    for module in (auth, profiles, agenda, bookings, jobs, meta):
         app.include_router(module.router)
+    # Signed (not encrypted) cookie holding the signed-in user's id and email; lax: no cross-site POSTs.
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=settings.secret_key,
+        session_cookie="slotbot_session",
+        max_age=30 * 24 * 3600,
+        same_site="lax",
+        https_only=settings.public_url.startswith("https://"),
+    )
 
     @app.exception_handler(ConfigError)
     async def config_error(_: Request, e: ConfigError) -> JSONResponse:

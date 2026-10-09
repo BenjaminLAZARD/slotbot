@@ -1,9 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from slotbot.api.deps import C
+from slotbot.api.deps import C, current_user
 from slotbot.schemas import MetaOut, ProviderOut
 
-router = APIRouter(prefix="/api", tags=["meta"])
+router = APIRouter(prefix="/api", tags=["meta"], dependencies=[Depends(current_user)])
 
 
 @router.get("/meta")

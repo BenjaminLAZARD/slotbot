@@ -1,10 +1,12 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
-from slotbot.api.deps import C
+from slotbot.api.deps import C, owned_profile
 from slotbot.schemas import ActionOut, AgendaEventOut, AgendaOut
 from slotbot.services.agenda import ActionRefused, AgendaItem
 
-router = APIRouter(prefix="/api/profiles/{profile_id}", tags=["agenda"])
+router = APIRouter(
+    prefix="/api/profiles/{profile_id}", tags=["agenda"], dependencies=[Depends(owned_profile)]
+)
 
 
 @router.get("/agenda")

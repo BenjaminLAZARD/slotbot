@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { PlusIcon } from 'lucide-react'
-import type { Profile } from '@/api/client'
-import { useMeta, useProfiles } from '@/api/hooks'
+import { LogOutIcon, PlusIcon } from 'lucide-react'
+import type { Profile, Session } from '@/api/client'
+import { useMeta, useProfiles, useSession, useSignOut } from '@/api/hooks'
 import { BookingsPanel } from '@/components/BookingsPanel'
+import { Landing } from '@/components/Landing'
 import { ProfileSettings } from '@/components/ProfileSettings'
 import { VenuesPanel } from '@/components/VenuesPanel'
 import { SetupCard } from '@/components/SetupCard'
@@ -11,6 +12,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 
 export default function App() {
+  const session = useSession()
+  const [about, setAbout] = useState(false)
+  if (session.isPending) return <div className="min-h-svh bg-background" />
+  if (!session.data?.signed_in || about) {
+    return <Landing session={session.data} onOpenApp={() => setAbout(false)} />
+  }
+  return <Workspace session={session.data} onAbout={() => setAbout(true)} />
+}
+
+function Workspace({ session, onAbout }: { session: Session; onAbout: () => void }) {
+  const signOut = useSignOut()
   const profiles = useProfiles()
   const meta = useMeta()
   const [selected, setSelected] = useState<number | 'new' | null>(null)
@@ -28,7 +40,20 @@ export default function App() {
               Books public courts the moment they open, straight from your calendar.
             </p>
           </div>
-          {meta.data && <span className="text-xs text-muted-foreground">triggers: {meta.data.triggers}</span>}
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            {meta.data && <span className="hidden text-xs sm:inline">triggers: {meta.data.triggers}</span>}
+            <button onClick={onAbout} className="hover:text-foreground">
+              About
+            </button>
+            {session.sign_in_enabled && (
+              <>
+                <span className="hidden sm:inline">{session.email}</span>
+                <Button variant="ghost" size="sm" onClick={() => signOut.mutate()}>
+                  <LogOutIcon /> Sign out
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </header>
 

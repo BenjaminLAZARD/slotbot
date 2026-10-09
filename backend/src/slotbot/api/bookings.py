@@ -1,17 +1,18 @@
 from fastapi import APIRouter, HTTPException
 
-from slotbot.api.deps import DB, C
-from slotbot.models import Booking, BookingStatus
+from slotbot.api.deps import DB, C, CurrentUser
+from slotbot.models import Booking, BookingStatus, Profile
 from slotbot.schemas import BookingOut
 
 router = APIRouter(prefix="/api/bookings", tags=["bookings"])
 
 
 @router.post("/{booking_id}/retry", status_code=202)
-async def retry(booking_id: int, db: DB, c: C) -> BookingOut:
+async def retry(booking_id: int, db: DB, c: C, me: CurrentUser) -> BookingOut:
     """Race again now, e.g. after a failure. Only once the booking window is open."""
     booking = await db.get(Booking, booking_id)
-    if booking is None:
+    profile = await db.get(Profile, booking.profile_id) if booking else None
+    if booking is None or profile is None or profile.owner_id != me.id:
         raise HTTPException(404, "booking not found")
     if booking.status in (BookingStatus.RACING, BookingStatus.BOOKED):
         raise HTTPException(409, f"booking is {booking.status}")

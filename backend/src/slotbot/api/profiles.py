@@ -3,7 +3,7 @@ from datetime import timedelta
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 
-from slotbot.api.deps import DB, C
+from slotbot.api.deps import DB, C, CurrentUser, OwnedProfile
 from slotbot.domain.describe import has_marker
 from slotbot.domain.ranking import nearby
 from slotbot.models import Booking, BookingStatus, Profile
@@ -22,28 +22,28 @@ router = APIRouter(prefix="/api/profiles", tags=["profiles"])
 
 
 @router.get("")
-async def list_profiles(db: DB) -> list[ProfileOut]:
-    return [_out(p) for p in await db.scalars(select(Profile).order_by(Profile.id))]
+async def list_profiles(db: DB, me: CurrentUser) -> list[ProfileOut]:
+    rows = await db.scalars(select(Profile).where(Profile.owner_id == me.id).order_by(Profile.id))
+    return [_out(p) for p in rows]
 
 
 @router.post("", status_code=201)
-async def create_profile(body: ProfileIn, db: DB, c: C) -> ProfileOut:
+async def create_profile(body: ProfileIn, db: DB, c: C, me: CurrentUser) -> ProfileOut:
     _check_provider(c, body.config)
-    profile = Profile(name=body.name, config=body.config.model_dump())
+    profile = Profile(owner_id=me.id, name=body.name, config=body.config.model_dump())
     db.add(profile)
     await db.commit()
     return _out(profile)
 
 
 @router.get("/{profile_id}")
-async def get_profile(profile_id: int, db: DB) -> ProfileOut:
-    return _out(await _load(db, profile_id))
+async def get_profile(profile: OwnedProfile) -> ProfileOut:
+    return _out(profile)
 
 
 @router.put("/{profile_id}")
-async def update_profile(profile_id: int, body: ProfileIn, db: DB, c: C) -> ProfileOut:
+async def update_profile(profile: OwnedProfile, body: ProfileIn, db: DB, c: C) -> ProfileOut:
     _check_provider(c, body.config)
-    profile = await _load(db, profile_id)
     if body.config.calendar_id != profile.config.get("calendar_id"):
         profile.calendar_ok_at = None
     profile.name, profile.config = body.name, body.config.model_dump()
@@ -52,10 +52,9 @@ async def update_profile(profile_id: int, body: ProfileIn, db: DB, c: C) -> Prof
 
 
 @router.delete("/{profile_id}", status_code=204)
-async def delete_profile(profile_id: int, db: DB, c: C) -> None:
-    profile = await _load(db, profile_id)
+async def delete_profile(profile: OwnedProfile, db: DB, c: C) -> None:
     pending = await db.scalars(
-        select(Booking).where(Booking.profile_id == profile_id, Booking.status == BookingStatus.PENDING)
+        select(Booking).where(Booking.profile_id == profile.id, Booking.status == BookingStatus.PENDING)
     )
     for booking in pending:
         if booking.trigger_ref:
@@ -65,8 +64,7 @@ async def delete_profile(profile_id: int, db: DB, c: C) -> None:
 
 
 @router.put("/{profile_id}/credentials", status_code=204)
-async def set_credentials(profile_id: int, body: CredentialsIn, db: DB, c: C) -> None:
-    profile = await _load(db, profile_id)
+async def set_credentials(profile: OwnedProfile, body: CredentialsIn, db: DB, c: C) -> None:
     provider = c.providers.get(ProfileConfig.model_validate(profile.config).provider)
     if missing := [f for f in provider.credential_fields if not body.values.get(f)]:
         raise HTTPException(422, f"missing: {', '.join(missing)}")
@@ -76,9 +74,8 @@ async def set_credentials(profile_id: int, body: CredentialsIn, db: DB, c: C) ->
 
 
 @router.post("/{profile_id}/check-calendar")
-async def check_calendar(profile_id: int, db: DB, c: C) -> CalendarCheckOut:
+async def check_calendar(profile: OwnedProfile, db: DB, c: C) -> CalendarCheckOut:
     """Read the calendar as the bot would; a clear error says what to share if Google refuses."""
-    profile = await _load(db, profile_id)
     cfg = ProfileConfig.model_validate(profile.config)
     events = await c.calendar.upcoming(cfg.calendar_id, c.clock.now(), cfg.lookahead_days)
     profile.calendar_ok_at = c.clock.now()
@@ -92,8 +89,8 @@ async def check_calendar(profile_id: int, db: DB, c: C) -> CalendarCheckOut:
 
 
 @router.post("/{profile_id}/test-notification", status_code=204)
-async def test_notification(profile_id: int, db: DB, c: C) -> None:
-    cfg = ProfileConfig.model_validate((await _load(db, profile_id)).config)
+async def test_notification(profile: OwnedProfile, c: C) -> None:
+    cfg = ProfileConfig.model_validate(profile.config)
     if c.notifier is None:
         raise HTTPException(422, "email is off: set SLOTBOT_RESEND_API_KEY in .env (see README)")
     if not cfg.notify_email:
@@ -105,9 +102,8 @@ async def test_notification(profile_id: int, db: DB, c: C) -> None:
 
 
 @router.post("/{profile_id}/check-login")
-async def check_login(profile_id: int, db: DB, c: C) -> LoginCheckOut:
+async def check_login(profile: OwnedProfile, db: DB, c: C) -> LoginCheckOut:
     """Log in with the stored credentials and read the closest venue's furthest open day. Books nothing."""
-    profile = await _load(db, profile_id)
     cfg = ProfileConfig.model_validate(profile.config)
     provider = c.providers.get(cfg.provider)
     if provider.credential_fields and not profile.credentials:
@@ -130,9 +126,9 @@ async def check_login(profile_id: int, db: DB, c: C) -> LoginCheckOut:
 
 
 @router.get("/{profile_id}/venues")
-async def list_venues(profile_id: int, db: DB, c: C, refresh: bool = False) -> list[VenueOut]:
+async def list_venues(profile: OwnedProfile, c: C, refresh: bool = False) -> list[VenueOut]:
     """Venues in bike range of the profile's home, closest first (refresh=true re-fetches them)."""
-    cfg = ProfileConfig.model_validate((await _load(db, profile_id)).config)
+    cfg = ProfileConfig.model_validate(profile.config)
     point = await c.geocoder.locate(cfg.home) if cfg.home else None
     if point is None:
         raise HTTPException(422, "set a home address the geocoder can find")
@@ -144,27 +140,21 @@ async def list_venues(profile_id: int, db: DB, c: C, refresh: bool = False) -> l
 
 
 @router.post("/{profile_id}/sync")
-async def sync_profile(profile_id: int, c: C, refresh_venues: bool = False) -> BookingOut | None:
-    """Plan the next candidate event now instead of waiting for the daily sync."""
+async def sync_profile(profile: OwnedProfile, c: C, refresh_venues: bool = False) -> BookingOut | None:
+    """Plan the next candidate event now instead of waiting for the hourly sync."""
     try:
-        booking = await c.sync.sync_profile(profile_id, refresh_venues)
+        booking = await c.sync.sync_profile(profile.id, refresh_venues)
     except LookupError:
         raise HTTPException(404, "profile not found") from None
     return BookingOut.model_validate(booking) if booking else None
 
 
 @router.get("/{profile_id}/bookings")
-async def list_bookings(profile_id: int, db: DB) -> list[BookingOut]:
+async def list_bookings(profile: OwnedProfile, db: DB) -> list[BookingOut]:
     rows = await db.scalars(
-        select(Booking).where(Booking.profile_id == profile_id).order_by(Booking.play_start.desc())
+        select(Booking).where(Booking.profile_id == profile.id).order_by(Booking.play_start.desc())
     )
     return [BookingOut.model_validate(b) for b in rows]
-
-
-async def _load(db: DB, profile_id: int) -> Profile:
-    if (profile := await db.get(Profile, profile_id)) is None:
-        raise HTTPException(404, "profile not found")
-    return profile
 
 
 def _check_provider(c: C, cfg: ProfileConfig) -> None:

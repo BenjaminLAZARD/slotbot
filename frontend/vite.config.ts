@@ -10,7 +10,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { '@': path.resolve(import.meta.dirname, './src') } },
   server: {
-    proxy: { '/api': api },
+    proxy: { '/api': api, '/auth': api },
     // Inside docker compose, file events from the bind mount are unreliable: poll instead.
     watch: process.env.VITE_USE_POLLING ? { usePolling: true, interval: 5000 } : undefined,
   },

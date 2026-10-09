@@ -1,7 +1,8 @@
 """Instance-wide settings, read from environment variables (prefix SLOTBOT_) or a .env file."""
 
-from typing import Literal
+from typing import Literal, Self
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,6 +18,13 @@ class Settings(BaseSettings):
     google_service_account: str = ""
     # Shown to Nominatim (OpenStreetMap geocoder), whose usage policy asks for a contact.
     contact_email: str = ""
+
+    # Sign-in with Google: OAuth client ID (APIs & Services > Credentials, type "Web application").
+    # Empty = no sign-in, everything belongs to one local user: allowed only on localhost.
+    google_client_id: str = ""
+    # Invite list: Google accounts allowed to sign in, comma-separated. The first one is the instance
+    # owner and inherits profiles created before sign-in existed.
+    allowed_emails: str = ""
 
     # Email notifications. Preferred: Resend with a "Sending access" API key (can only send).
     # Without your own domain Resend only delivers to your Resend account's address.
@@ -34,6 +42,9 @@ class Settings(BaseSettings):
     cloud_tasks_queue: str = ""  # projects/<project>/locations/<region>/queues/<queue>
     public_url: str = "http://localhost:8000"  # base URL Cloud Tasks calls back
     job_token: str = ""  # shared secret expected in X-Job-Token (or ?token=) on /jobs/*
+    # Service account whose Google-signed token /jobs/* also requires (set once the service is public;
+    # while it is private, Cloud Run checks those tokens itself).
+    job_caller: str = ""
     # GCP project whose billing the budget kill switch may disable (empty = kill switch off).
     gcp_project: str = ""
 
@@ -47,3 +58,13 @@ class Settings(BaseSettings):
 
     madrid_opens_at: str = "00:00"  # hour the D-6 slots open (scripts/probe_madrid_opening.py measures it)
     madrid_request_light: bool = True  # when the site asks "with floodlights?" (paid extra), answer yes
+
+    @property
+    def invited(self) -> list[str]:
+        return [e.strip().lower() for e in self.allowed_emails.split(",") if e.strip()]
+
+    @model_validator(mode="after")
+    def _sign_in_outside_localhost(self) -> Self:
+        if not self.google_client_id and not self.public_url.startswith("http://localhost"):
+            raise ValueError("SLOTBOT_GOOGLE_CLIENT_ID is required when the app is not on localhost")
+        return self

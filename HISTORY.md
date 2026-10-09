@@ -6,6 +6,42 @@ entry at the top at the end of each working session.
 
 ---
 
+## 2026-10-09 · v0.8: Sign in with Google, invite list, landing page (not deployed yet)
+
+### First cloud race (night of 8 → 9 Oct, Thu 15 Oct 19:00)
+- Cloud Tasks fired at 23:55; the bot polled from 23:59:00 and saw the window open at **00:00:01**:
+  **midnight, D−6 confirmed** for Benjamin's centres. Concepción · Tenis 3 19:00 was in the cart 20 s
+  later, but the wallet held €10.00 for a **€10.60** court (La Elipa was €6.90; probably floodlights,
+  not verified). The bot stopped without paying ("Failure - Tennis", email sent; the cart expired).
+- The low-wallet warning compares with the *last price paid* (€6.90), so it didn't fire.
+
+### Sign-in (Benjamin's choice: Google sign-in, public site, landing page)
+- `users` table + `profiles.owner_id` (migration `c4e1a7d2f9b0`). `AccountService`: verify the
+  Google credential, check `SLOTBOT_ALLOWED_EMAILS`, upsert the user; the first invited address adopts
+  profiles created before sign-in. Session = Starlette signed cookie (uid + email), 30 days, lax.
+- Every `/api/*` route goes through `current_user`; profile routes through `owned_profile` (someone
+  else's profile is a 404). Strangers are rejected from the cookie alone, without a database read.
+- `GoogleIdentity` verifies Google ID tokens with Google's public keys, cached 1 h and kept if a
+  refetch fails (a blip at Google must not lose a race). `/jobs/*` also requires the bot's OIDC
+  token when `SLOTBOT_JOB_CALLER` is set (needed once the service is public).
+- No client ID = sign-in off, single local user; refused at startup unless `public_url` is localhost.
+- Frontend: public **landing page** (how it works, what you need, privacy section; "not affiliated
+  with the Ayuntamiento"), Google's sign-in button (GIS script), Sign out / About in the app header,
+  401 → back to the landing page.
+- 40 tests (sign-in, invite list, profile isolation, jobs OIDC, token checker with a local RSA key).
+- Locally: nothing runs on the Mac any more (docker stack stopped); the landing page was previewed on
+  a throwaway SQLite server.
+
+### Open items
+1. **Benjamin: create the OAuth client** (deploy/gcp.md §9) and send the Client ID; then deploy,
+   sign in, go public, and re-test the scheduler and budget jobs (does Cloud Run pass the OIDC
+   `Authorization` header through intact once public? if not, unset `SLOTBOT_JOB_CALLER`).
+2. Wallet: top up, Retry 15 Oct if wanted. Better warning: compare with the highest recent price,
+   and when the wallet can't pay, drop that cart item and try a cheaper court instead of stopping.
+3. Friends' emails need a domain verified in Resend (the free sender only reaches Benjamin).
+
+---
+
 ## 2026-10-08 (evening) · v0.7: running on Google Cloud
 
 ### What is live (project `divine-camera-228017`, step by step in deploy/gcp.md)

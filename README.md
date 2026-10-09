@@ -136,6 +136,15 @@ Nothing runs 24/7: Cloud Run hosts the container and scales to zero, **Cloud Tas
 database is **Neon** Postgres (also scales to zero). A €10 budget alerts by email and, through
 Pub/Sub → `/jobs/budget`, detaches billing when reached. Step-by-step: [deploy/gcp.md](deploy/gcp.md).
 
+## Sign-in and several people
+
+The site's front page explains slotbot to visitors; the app behind it needs **Sign in with Google**.
+Only accounts on the invite list (`SLOTBOT_ALLOWED_EMAILS`) get in, and each person sees only their
+own profiles. The browser receives a Google-signed ID token, the API verifies it against Google's
+public keys and keeps the user's id in a signed session cookie. On localhost without
+`SLOTBOT_GOOGLE_CLIENT_ID`, sign-in is off and everything belongs to one local user. `/jobs/*` (the
+machines) never use the cookie: job token, plus Google's OIDC token once the service is public.
+
 ## Project layout
 
 ```

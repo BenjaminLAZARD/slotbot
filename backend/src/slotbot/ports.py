@@ -85,3 +85,18 @@ class Clock(Protocol):
     def now(self) -> datetime: ...
 
     async def sleep(self, seconds: float) -> None: ...
+
+
+@dataclass(frozen=True)
+class Identity:
+    """Who signed a token: a person signing in, or a service account calling /jobs/*."""
+
+    email: str
+    subject: str  # stable account ID (Google "sub")
+    name: str = ""
+
+
+class IdentityVerifier(Protocol):
+    async def verify(self, token: str, audience: str) -> Identity:
+        """Check the token's signature, expiry and audience; raises ValueError if any is wrong."""
+        ...

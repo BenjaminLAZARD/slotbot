@@ -4,6 +4,60 @@
  */
 
 export interface paths {
+    "/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Session
+         * @description Public: lets the page choose between the landing page and the app.
+         */
+        get: operations["session_auth_session_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/google": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Google */
+        post: operations["google_auth_google_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Logout */
+        post: operations["logout_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/profiles": {
         parameters: {
             query?: never;
@@ -146,7 +200,7 @@ export interface paths {
         put?: never;
         /**
          * Sync Profile
-         * @description Plan the next candidate event now instead of waiting for the daily sync.
+         * @description Plan the next candidate event now instead of waiting for the hourly sync.
          */
         post: operations["sync_profile_api_profiles__profile_id__sync_post"];
         delete?: never;
@@ -286,6 +340,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/jobs/budget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Budget
+         * @description Pub/Sub push from a GCP budget: cut billing once actual spend reaches the budget (hard cap).
+         */
+        post: operations["budget_jobs_budget_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/meta": {
         parameters: {
             query?: never;
@@ -399,6 +473,11 @@ export interface components {
             events: number;
             /** Candidates */
             candidates: number;
+        };
+        /** CredentialIn */
+        CredentialIn: {
+            /** Credential */
+            credential: string;
         };
         /** CredentialsIn */
         CredentialsIn: {
@@ -545,6 +624,28 @@ export interface components {
             /** Credential Fields */
             credential_fields: string[];
         };
+        /** SessionOut */
+        SessionOut: {
+            /** Signed In */
+            signed_in: boolean;
+            /**
+             * Email
+             * @default
+             */
+            email: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /** Sign In Enabled */
+            sign_in_enabled: boolean;
+            /**
+             * Google Client Id
+             * @default
+             */
+            google_client_id: string;
+        };
         /**
          * Titles
          * @description Title fragments marking each stage. `candidate` is what you type in your calendar.
@@ -609,6 +710,77 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    session_auth_session_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionOut"];
+                };
+            };
+        };
+    };
+    google_auth_google_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CredentialIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    logout_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_profiles_api_profiles_get: {
         parameters: {
             query?: never;
@@ -1136,6 +1308,43 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: boolean;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    budget_jobs_budget_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

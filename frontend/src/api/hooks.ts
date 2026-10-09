@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { api, call, type ProfileInput } from './client'
 
 const keys = {
+  session: ['session'],
   meta: ['meta'],
   profiles: ['profiles'],
   bookings: (id: number) => ['bookings', id],
@@ -10,6 +11,34 @@ const keys = {
 }
 
 const onError = (e: Error) => toast.error(e.message)
+
+/** Public: are we signed in, and which Google client the sign-in button uses. */
+export const useSession = () =>
+  useQuery({ queryKey: keys.session, queryFn: () => call(api.GET('/auth/session')), staleTime: 60_000 })
+
+export function useSignIn() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (credential: string) => call(api.POST('/auth/google', { body: { credential } })),
+    onSuccess: (session) => {
+      qc.clear()
+      qc.setQueryData(keys.session, session)
+    },
+    onError,
+  })
+}
+
+export function useSignOut() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => call(api.POST('/auth/logout')),
+    onSuccess: () => {
+      qc.clear()
+      void qc.invalidateQueries({ queryKey: keys.session })
+    },
+    onError,
+  })
+}
 
 export const useMeta = () =>
   useQuery({ queryKey: keys.meta, queryFn: () => call(api.GET('/api/meta')) })

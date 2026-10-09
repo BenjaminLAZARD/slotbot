@@ -159,7 +159,34 @@ gcloud artifacts repositories set-cleanup-policies cloud-run-source-deploy --pro
   --location $REGION --policy /tmp/cleanup.json --no-dry-run
 ```
 
-## 9. Open the UI
+## 9. Sign-in, then going public
+
+1. **OAuth client** (console only for projects without an organization):
+   <https://console.cloud.google.com/auth/overview?project=$PROJECT> → *Get started* (app name,
+   support email, audience **External**) → *Clients* → *Create client* → *Web application*,
+   authorized JavaScript origins `$URL` and `http://localhost:5173` → copy the Client ID (public,
+   not a secret) → *Audience* → *Publish app* (only the basic `openid email profile` scopes: no review).
+2. **Deploy with sign-in on**, still private:
+   ```bash
+   gcloud run services update slotbot --project $PROJECT --region $REGION \
+     --update-env-vars SLOTBOT_GOOGLE_CLIENT_ID=$CLIENT_ID,SLOTBOT_ALLOWED_EMAILS=you@gmail.com
+   ```
+   Commas separate invites, so add friends with `--env-vars-file` or the console. The first address
+   owns the profiles created before sign-in existed.
+3. **Go public**: `/jobs/*` must now check Google's token itself, then Cloud Run stops checking:
+   ```bash
+   gcloud run services update slotbot --project $PROJECT --region $REGION --update-env-vars SLOTBOT_JOB_CALLER=$SA
+   gcloud run services add-iam-policy-binding slotbot --project $PROJECT --region $REGION \
+     --member allUsers --role roles/run.invoker
+   ```
+   Then check: `gcloud scheduler jobs run slotbot-sync …` and the budget test message still answer 200.
+   Back to private: `gcloud run services remove-iam-policy-binding … --member allUsers --role roles/run.invoker`.
+
+Strangers then see the landing page and `401` on the API, which is rejected from the signed cookie
+alone (no database read, so junk traffic never wakes Neon). `max-instances 1` and the €10 kill
+switch bound the worst case.
+
+## 10. Open the UI (while private)
 
 The service is private (no login screen yet; that comes with multi-user). Open it through an
 authenticated local proxy:

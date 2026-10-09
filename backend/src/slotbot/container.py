@@ -12,10 +12,12 @@ from slotbot.adapters.email import ResendNotifier, SmtpNotifier
 from slotbot.adapters.geocoder import Nominatim
 from slotbot.adapters.google_auth import GoogleToken
 from slotbot.adapters.google_calendar import GoogleCalendar
+from slotbot.adapters.google_identity import GoogleIdentity
 from slotbot.adapters.triggers import CloudTasksTriggers, LocalTriggers
 from slotbot.adapters.vault import Vault
-from slotbot.ports import Calendar, Clock, Geocoder, Notifier, Triggers
+from slotbot.ports import Calendar, Clock, Geocoder, IdentityVerifier, Notifier, Triggers
 from slotbot.providers import ProviderRegistry, build_registry
+from slotbot.services.accounts import AccountService
 from slotbot.services.agenda import AgendaService
 from slotbot.services.local_loop import LocalLoop
 from slotbot.services.planner import Planner
@@ -41,6 +43,8 @@ class Container:
     sync: SyncService
     race: RaceService
     agenda: AgendaService
+    identity: IdentityVerifier
+    accounts: AccountService
     notifier: Notifier | None
     kill_switch: BillingKillSwitch | None
     local_loop: LocalLoop | None
@@ -102,6 +106,9 @@ def build_container(settings: Settings, http: httpx.AsyncClient) -> Container:
         next_sync=lambda: loop.next_sync if loop else None,  # Cloud Scheduler: not known here
     )
 
+    identity = GoogleIdentity(http, clock)
+    accounts = AccountService(sessions, identity, clock, settings.google_client_id, settings.invited)
+
     return Container(
         settings=settings,
         engine=engine,
@@ -117,6 +124,8 @@ def build_container(settings: Settings, http: httpx.AsyncClient) -> Container:
         sync=sync,
         race=race,
         agenda=agenda,
+        identity=identity,
+        accounts=accounts,
         notifier=notifier,
         kill_switch=BillingKillSwitch(http, google, settings.gcp_project) if settings.gcp_project else None,
         local_loop=local_loop,

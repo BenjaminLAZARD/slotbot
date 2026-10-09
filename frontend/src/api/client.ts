@@ -11,6 +11,15 @@ export type ProfileConfig = S['ProfileConfig']
 export type Booking = S['BookingOut']
 export type Venue = S['VenueOut']
 export type Meta = S['MetaOut']
+export type Session = S['SessionOut']
+
+export class ApiError extends Error {
+  readonly status: number
+  constructor(status: number, message: string) {
+    super(message)
+    this.status = status
+  }
+}
 
 /** Unwrap an openapi-fetch result, turning FastAPI's `{detail}` errors into readable exceptions. */
 export async function call<T>(
@@ -18,7 +27,7 @@ export async function call<T>(
 ): Promise<T> {
   const { data, error, response } = await request
   if (error !== undefined || !response.ok) {
-    throw new Error(detail(error) ?? `${response.status} ${response.statusText}`)
+    throw new ApiError(response.status, detail(error) ?? `${response.status} ${response.statusText}`)
   }
   return data as T
 }

@@ -33,12 +33,27 @@ class Base(DeclarativeBase):
     type_annotation_map = {datetime: UTCDateTime, dict[str, Any]: JSON, list[Any]: JSON}
 
 
+class User(Base):
+    """A person who signs in with Google (invite list in settings)."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(320), unique=True)
+    google_sub: Mapped[str | None] = mapped_column(String(255), unique=True)  # stable Google account ID
+    name: Mapped[str] = mapped_column(String(200), default="")
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    last_login_at: Mapped[datetime | None]
+
+
 class Profile(Base):
     """One person's automation: which calendar to watch, where they live, which site to book."""
 
     __tablename__ = "profiles"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Null only for profiles created before sign-in existed; the instance owner adopts them.
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(100))
     config: Mapped[dict[str, Any]]  # validated by schemas.ProfileConfig
     credentials: Mapped[str | None] = mapped_column(Text)  # Fernet-encrypted JSON
