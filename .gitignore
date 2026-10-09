@@ -25,3 +25,10 @@ dist/
 
 # Opening-hour probe output
 .probe-*.log
+
+# OpenTofu
+infra/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfplan

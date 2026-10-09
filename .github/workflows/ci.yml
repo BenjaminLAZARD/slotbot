@@ -34,3 +34,25 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run build
+
+  # Deploy main to Cloud Run once both checks pass. Keyless: GitHub's signed token is exchanged for
+  # the slotbot-deployer account (Workload Identity Federation, infra/deploy.tf). Free within the
+  # GitHub Actions and Cloud Build free tiers. Off unless the repository variable CD_ENABLED is "true".
+  deploy:
+    needs: [backend, frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.CD_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: gcloud run deploy slotbot --source . --region europe-southwest1 --project "${{ vars.GCP_PROJECT }}" --quiet

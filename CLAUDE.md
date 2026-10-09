@@ -15,3 +15,6 @@ add a dated entry at the top of HISTORY.md: what changed, why, what was verified
 - Backend: `cd backend && uv run pytest && uv run ruff check src tests && uv run ruff format src tests`
 - Migration: `cd backend && uv run alembic revision --autogenerate -m "..."` (db container running)
 - Frontend: `cd frontend && npm run build && npm run lint`; after API changes `npm run gen:api`
+- Cloud infra: `infra/tofu.sh plan` / `apply` (OpenTofu; never change cloud resources with gcloud directly)
+- Deploy: push to main (GitHub Actions, when repo variable CD_ENABLED=true) or `gcloud run deploy slotbot --source . --region europe-southwest1 --project divine-camera-228017`
+- Cloud bot: `deploy/bot.sh pause|resume|status`; private site: `deploy/proxy.sh`

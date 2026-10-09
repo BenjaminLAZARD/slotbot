@@ -6,6 +6,40 @@ entry at the top at the end of each working session.
 
 ---
 
+## 2026-10-09 (morning) · v0.9: infrastructure as code (OpenTofu), keyless deploys (off for now)
+
+### Why
+Benjamin asked how the GCP setup is defined: it was ~30 hand-run gcloud commands, the real config
+lived only in GCP, and it had already drifted (floodlights env set by hand). Choice: **OpenTofu**
+(open-source Terraform), no Terragrunt (one project, one environment). CI/CD only if free: it is
+(GitHub Actions: 2,000 free min/month on private repos; Cloud Build: 2,500 free build-min/month; a
+build takes ~1 min).
+
+### What
+- `infra/`: APIs, bot service account + roles, secret containers, Cloud Run service (env and
+  secrets now set in `terraform.tfvars`; image ignored: deploys own it), queue, hourly scan, budget +
+  Pub/Sub kill-switch push, registry cleanup, `public` switch (allUsers + `SLOTBOT_JOB_CALLER`).
+  State in `gs://divine-camera-228017-tofu-state` (private, versioned, created by hand). Provider
+  hashicorp/google 8.6, OpenTofu 1.13. `infra/tofu.sh` runs as the active gcloud account with the
+  project as quota project (ADC absent / other account on this Mac).
+- **Adopted** the hand-made resources with `import` blocks: 32 imported, 0 changed; `imports.tf`
+  then deleted; `plan` = "No changes". Enabled `cloudresourcemanager.googleapis.com` (the provider
+  needs it). Scheduler `paused` / queue `desired_state` ignored, so `deploy/bot.sh pause` isn't drift
+  (verified: paused, plan clean, resumed).
+- **Deploys**: Workload Identity Federation pool `github`, provider limited to
+  `BenjaminLAZARD/slotbot` on `refs/heads/main`, account `slotbot-deployer` (Cloud Run Source
+  Developer, Service Usage Consumer, Logs Viewer, act-as the bot and the default compute account
+  that runs builds). `ci.yml` job `deploy` after both checks; repository variables GCP_PROJECT,
+  GCP_WIF_PROVIDER, GCP_DEPLOYER, **CD_ENABLED=false**.
+- `.gcloudignore` excludes `infra/` (provider binaries must not be uploaded with the source).
+
+### Open items
+1. CD stays off until the sign-in Client ID is set in `terraform.tfvars` (the new code refuses to
+   start in the cloud without it). Then `CD_ENABLED=true`, push, and watch the first run: the
+   deployer's permissions are untested (likely gaps: storage on the run-sources bucket, build logs).
+
+---
+
 ## 2026-10-09 · v0.8: Sign in with Google, invite list, landing page (not deployed yet)
 
 ### First cloud race (night of 8 → 9 Oct, Thu 15 Oct 19:00)

@@ -1,7 +1,9 @@
 # Deploying on Google Cloud (scale to zero)
 
-> Run end to end on 2026-10-08 (see HISTORY.md, v0.7). The commands below are the ones that worked,
-> with the fixes found on the way.
+> **Since 2026-10-09 the setup is code: [infra/](../infra/README.md) (OpenTofu).** Change things
+> there and `infra/tofu.sh apply`; deploys go through GitHub Actions. This page stays as the
+> explanation of each piece and the record of how it was first built by hand on 2026-10-08
+> (HISTORY.md, v0.7), with the fixes found on the way.
 
 ```
 Cloud Scheduler (hourly) ──► POST /jobs/sync ─────┐
@@ -166,21 +168,14 @@ gcloud artifacts repositories set-cleanup-policies cloud-run-source-deploy --pro
    support email, audience **External**) → *Clients* → *Create client* → *Web application*,
    authorized JavaScript origins `$URL` and `http://localhost:5173` → copy the Client ID (public,
    not a secret) → *Audience* → *Publish app* (only the basic `openid email profile` scopes: no review).
-2. **Deploy with sign-in on**, still private:
-   ```bash
-   gcloud run services update slotbot --project $PROJECT --region $REGION \
-     --update-env-vars SLOTBOT_GOOGLE_CLIENT_ID=$CLIENT_ID,SLOTBOT_ALLOWED_EMAILS=you@gmail.com
-   ```
-   Commas separate invites, so add friends with `--env-vars-file` or the console. The first address
-   owns the profiles created before sign-in existed.
-3. **Go public**: `/jobs/*` must now check Google's token itself, then Cloud Run stops checking:
-   ```bash
-   gcloud run services update slotbot --project $PROJECT --region $REGION --update-env-vars SLOTBOT_JOB_CALLER=$SA
-   gcloud run services add-iam-policy-binding slotbot --project $PROJECT --region $REGION \
-     --member allUsers --role roles/run.invoker
-   ```
-   Then check: `gcloud scheduler jobs run slotbot-sync …` and the budget test message still answer 200.
-   Back to private: `gcloud run services remove-iam-policy-binding … --member allUsers --role roles/run.invoker`.
+2. **Sign-in on**, still private: in `infra/terraform.tfvars`, add to `env`
+   `SLOTBOT_GOOGLE_CLIENT_ID = "…apps.googleusercontent.com"` and
+   `SLOTBOT_ALLOWED_EMAILS = "you@gmail.com, friend@gmail.com"` (the first address owns the profiles
+   created before sign-in existed), then `infra/tofu.sh apply`, then deploy the code.
+3. **Go public**: `public = true` in `terraform.tfvars`, `infra/tofu.sh apply`. That sets
+   `SLOTBOT_JOB_CALLER` (so `/jobs/*` checks Google's token itself) and lets everyone reach the
+   service. Then check: `gcloud scheduler jobs run slotbot-sync …` and the budget test message still
+   answer 200. Back to private: `public = false`, apply.
 
 Strangers then see the landing page and `401` on the API, which is rejected from the signed cookie
 alone (no database read, so junk traffic never wakes Neon). `max-instances 1` and the €10 kill
