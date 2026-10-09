@@ -3,7 +3,7 @@
 #
 # Cloud Run only runs when called, so pausing its two callers stops the bot: the hourly calendar
 # scan (Cloud Scheduler) and the race triggers (Cloud Tasks; paused tasks are kept and fire, late,
-# on resume). The budget kill switch keeps working.
+# on resume). The budget kill switch keeps working. `ui` = deploy/proxy.sh (the site while private).
 set -eu
 PROJECT=${SLOTBOT_GCP_PROJECT:-divine-camera-228017}
 TASKS_REGION=europe-west1
@@ -22,7 +22,7 @@ case "${1:-status}" in
     echo "race triggers: $(gcloud tasks queues describe slotbot $G --format 'value(state)')"
     gcloud tasks list --queue slotbot $G --format 'value(scheduleTime)' | sed 's/^/  queued race at /' ;;
   ui)
-    gcloud run services proxy slotbot --project "$PROJECT" --region $REGION --port 8090 ;;
+    exec "$(dirname "$0")/proxy.sh" ;;
   *)
     echo "usage: $0 pause|resume|status|ui" >&2; exit 2 ;;
 esac

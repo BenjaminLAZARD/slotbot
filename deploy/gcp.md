@@ -188,11 +188,13 @@ switch bound the worst case.
 
 ## 10. Open the UI (while private)
 
-The service is private (no login screen yet; that comes with multi-user). Open it through an
-authenticated local proxy:
+While the service is private, a browser can't open its URL: Google's front end wants an identity
+token from an account allowed to invoke the service, and browsers don't send one. `deploy/proxy.sh`
+runs `gcloud run services proxy`, a local server that adds your gcloud identity token to each request,
+and restarts it every 50 min because that token expires after about an hour (then: 401).
 
 ```bash
-gcloud run services proxy slotbot --project $PROJECT --region $REGION --port 8090   # http://localhost:8090
+deploy/proxy.sh          # http://localhost:8090 (or: deploy/proxy.sh 8091)
 ```
 
 Stop the local `docker compose` API when the cloud takes over: two bots would race each other for
